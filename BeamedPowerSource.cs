@@ -18,6 +18,9 @@ namespace BeamedPowerStandalone
         [KSPField(isPersistant = true, guiActive = false, guiActiveEditor = false)]
         public float constant;
 
+        [KSPField(isPersistant = true, guiActive = false, guiActiveEditor = false)]
+        public string TransmittingTo = " ";
+
         // 'dish_diameter', 'efficiency', and 'wavelength' are set in part .cfg file:
         // they're also displayed in the editor in part right click menu
         [KSPField(guiName = "Transmitter Dish Diameter", isPersistant = false, guiActive = false, guiActiveEditor = true, guiUnits = "m")]
