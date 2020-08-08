@@ -1,9 +1,10 @@
 ﻿using System;
+using System.IO;
+using System.Text;
 using UnityEngine;
 
 namespace BeamedPowerStandalone
 {
-    [KSPAddon(KSPAddon.Startup.SpaceCentre, true)]
     public class WirelessSource : PartModule
     {
         // creating things on part right click menu (flight)
@@ -34,7 +35,7 @@ namespace BeamedPowerStandalone
         public float Efficiency;
 
         // getting resource id of 'Electric Charge'
-        public int EChash = PartResourceLibrary.Instance.GetDefinition("ElectricCharge").id;
+        public int EChash = PartResourceLibrary.Instance.GetDefinition("ElectricCharge").id; int frames = 0;
 
         // setting action group capability
         [KSPAction(guiName = "Toggle Power Transmitter")]
@@ -87,6 +88,11 @@ namespace BeamedPowerStandalone
         // main block of code - runs every physics frame
         public void FixedUpdate()
         {
+            frames += 1;
+            if (frames == 30)
+            {
+                SaveNode();
+            }
             if (TransmittingTo == null)
             {
                 TransmittingTo = " ";
@@ -106,7 +112,7 @@ namespace BeamedPowerStandalone
                 }
                 else if (Wavelength == "Long")
                 {
-                    constant = Convert.ToSingle((1.44 * 5 * Math.Pow(10, -3)) / DishDiameter);
+                    constant = Convert.ToSingle((1.44 * Math.Pow(10, -3)) / DishDiameter);
                 }
                 else
                 {
@@ -123,10 +129,65 @@ namespace BeamedPowerStandalone
                 powerBeamed = 0;
             }
         }
-        //public override void OnSave(ConfigNode BPNode)
-        //{
-        //    BPNode.SetValue("excess", excess, createIfNotFound: true);
-        //    BPNode.SetValue("constant", constant, createIfNotFound: true);
-        //}
+
+        public void SaveNode()
+        {
+            frames = 0;
+            string filepath = KSPUtil.ApplicationRootPath + "GameData/BeamedPowerStandalone/PluginData/save.cfg";
+            FileInfo info = new FileInfo(filepath);
+            ConfigNode BPNode;
+            if (info.Length > 0)
+            {
+                BPNode = ConfigNode.Load(KSPUtil.ApplicationRootPath + "GameData/BeamedPowerStandalone/PluginData/save.cfg");
+            }
+            else
+            {
+                BPNode = new ConfigNode();
+            }
+            string vesselId = Convert.ToString(this.vessel.id); int n2 = 0;
+            while (n2 < BPNode.nodes.Count)
+            {
+                if (BPNode.nodes[n2].GetValue("vesselId") == vesselId)
+                {
+                    break;
+                }
+                n2 += 1;
+            }
+            ConfigNode CorrectNode = new ConfigNode();
+            if (n2 == BPNode.nodes.Count)
+            {
+                BPNode.AddNode("VESSEL", CorrectNode);
+            }
+            else
+            {
+                CorrectNode = BPNode.nodes[n2];
+            }
+            CorrectNode.SetValue("vesselId", vesselId, createIfNotFound: true);
+            CorrectNode.SetValue("wavelength", Wavelength, createIfNotFound: true);
+            CorrectNode.SetValue("excess", excess, createIfNotFound: true);
+            CorrectNode.SetValue("constant", constant, createIfNotFound: true);
+            CorrectNode.SetValue("TransmittingTo", "NoVessel", createIfNotFound: true);
+
+            // removes nodes that contain data about vessels that no longer exist
+            for (int a = 0; a < BPNode.nodes.Count; a++)
+            {
+                string vesselId2 = BPNode.nodes[a].GetValue("vesselId"); bool Found = false;
+                for (int b = 0; b < FlightGlobals.Vessels.Count; b++)
+                {
+                    if (vesselId2 == Convert.ToString(FlightGlobals.Vessels[b].id))
+                    {
+                        Found = true;
+                        break;
+                    }
+                }
+                if (Found == false)
+                {
+                    BPNode.RemoveNode(BPNode.nodes[a]);
+                }
+            }
+
+            BPNode.Save(KSPUtil.ApplicationRootPath + "GameData/BeamedPowerStandalone/PluginData/save.cfg", "Beamed Power");
+            //Saves the confignode to disk.
+        }
     }
 }

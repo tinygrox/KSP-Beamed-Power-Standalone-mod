@@ -6,7 +6,6 @@ namespace BeamedPowerStandalone
 {
     // Part module for spherical or multi-directional receivers
     // code relating to planetary occlusion has been commented out for now
-    [KSPAddon(KSPAddon.Startup.SpaceCentre, true)]
     public class WirelessReceiver : PartModule
     {
         // UI-right click menu in flight
@@ -20,18 +19,26 @@ namespace BeamedPowerStandalone
         public float received_power_ui;
 
         // 'recv_diameter' and 'recv_efficiency' values are set in part cfg file
-        [KSPField(guiName = "Receiver Dish Diameter", isPersistant = false, guiActive = false, guiActiveEditor = true, guiUnits = "m")]
+        [KSPField(isPersistant = false)]
         public float recvDiameter;
 
-        [KSPField(guiName = "Receiver Efficiency", isPersistant = false, guiActive = false, guiActiveEditor = true)]
+        [KSPField(isPersistant = false)]
         public float recvEfficiency;
 
         // declaring frequently used variables
-        public Vector3d source; public Vector3d dest; public int frames;
-        public List<Vessel> CorrectVesselList; public List<Part> CorrectPartList;
-        //public List<double> excessList; public List<double> constantList;
+        public Vector3d source; public Vector3d dest; double received_power;
+        public List<Vessel> CorrectVesselList; public int frames;
+        public List<double> excessList; public List<double> constantList;
         readonly int EChash = PartResourceLibrary.Instance.GetDefinition("ElectricCharge").id;
-        //WirelessReceiverDirectional DirectionalClass = new WirelessReceiverDirectional();
+        // WirelessSource modulesource = new WirelessSource();
+
+        public void Start()
+        {
+            frames = 595;
+            CorrectVesselList = new List<Vessel>();
+            excessList = new List<double>();
+            constantList = new List<double>();
+        }
 
         // setting action group capability
         [KSPAction(guiName = "Toggle Power Receiver")]
@@ -65,12 +72,6 @@ namespace BeamedPowerStandalone
             }
         }
 
-        // when the part module is first loaded, it initialises 'frames' which increments every frame in fixedupdate
-        public void Start()
-        {
-            frames = 595;
-        }
-
         // adding part info to part description tab in editor
         public string GetModuleTitle()
         {
@@ -90,20 +91,23 @@ namespace BeamedPowerStandalone
         // Loading all vessels that have WirelessSource module, and adding them to a list to use later
         private void LoadVesselsList()
         {
+            ConfigNode BPNode = ConfigNode.Load(KSPUtil.ApplicationRootPath + "GameData/BeamedPowerStandalone/PluginData/save.cfg");
             CorrectVesselList = new List<Vessel>();
-            CorrectPartList = new List<Part>();
-            //excessList = new List<double>();
-            //constantList = new List<double>();
+            excessList = new List<double>();
+            constantList = new List<double>();
             frames = 0;
-            
             for (int x = 0; x < FlightGlobals.Vessels.Count; x++)
             {
-                for (int y = 0; y < FlightGlobals.Vessels[x].Parts.Count; y++)
+                for (int n = 0; n < BPNode.nodes.Count; n++)
                 {
-                    if (FlightGlobals.Vessels[x].Parts[y].Modules.Contains<WirelessSource>() == true)
+                    string vesselId = BPNode.nodes[n].GetValue("persistentId");
+                    if (Convert.ToString(FlightGlobals.Vessels[x].id) == vesselId)
                     {
                         CorrectVesselList.Add(FlightGlobals.Vessels[x]);
-                        CorrectPartList.Add(FlightGlobals.Vessels[x].Parts[y]);
+                        double excess1 = Convert.ToDouble(BPNode.nodes[n].GetValue("excess"));
+                        double excess2 = Convert.ToDouble(BPNode.nodes[n].GetValue("constant"));
+                        excessList.Add(excess1);
+                        constantList.Add(excess2);
                         break;
                     }
                 }
@@ -120,17 +124,15 @@ namespace BeamedPowerStandalone
             }
             if (CorrectVesselList.Count > 0)
             {
-                dest = this.vessel.GetWorldPos3D();
-                double received_power = 0;
-                received_power_ui = 0;
                 if (Listening == true)
                 {
+                    dest = this.vessel.GetWorldPos3D();
+                    received_power = 0;
+
                     // adds up all the received power values from all vessels in CorrectVesselList 
                     for (int n = 0; n < CorrectVesselList.Count; n++)
                     {
-                        Part part = CorrectPartList[n];
-                        double excess2 = Convert.ToDouble(part.Modules.GetModule<WirelessSource>().Fields.GetValue("excess"));
-                        double constant2 = Convert.ToDouble(part.Modules.GetModule<WirelessSource>().Fields.GetValue("constant"));
+                        double excess2 = excessList[n]; double constant2 = constantList[n];
                         source = CorrectVesselList[n].GetWorldPos3D();
                         double distance = Vector3d.Distance(source, dest);
                         double spotsize = constant2 * distance;
@@ -154,10 +156,16 @@ namespace BeamedPowerStandalone
                     this.part.RequestResource(EChash, -received_power * Time.fixedDeltaTime);
                     received_power_ui = Convert.ToSingle(received_power);
                 }
+                else
+                {
+                    received_power_ui = 0;
+                    received_power = 0;
+                }
             }
-            if (Listening == false | CorrectVesselList.Count == 0)
+            else
             {
                 received_power_ui = 0;
+                received_power = 0;
             }
         }
     }

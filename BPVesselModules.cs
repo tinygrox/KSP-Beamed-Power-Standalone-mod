@@ -19,8 +19,7 @@ namespace BeamedPowerStandalone
             {
                 if (this.vessel.Parts[p].Modules.Contains<WirelessSource>() == true)
                 {
-                    double demand = Convert.ToDouble(this.vessel.Parts[p].Modules.GetModule<WirelessSource>().Fields.GetValue("powerBeamed"));
-                    this.vessel.Parts[p].RequestResource(EChash, demand * Time.fixedDeltaTime);
+                    
                 }
                 if (this.vessel.Parts[p].Modules.Contains<WirelessReceiverDirectional>() == true)
                 {
