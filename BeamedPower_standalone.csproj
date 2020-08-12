@@ -57,7 +57,10 @@
     <Compile Include="BeamedPowerReceiverDirectional.cs" />
     <Compile Include="BeamedPowerSource.cs" />
     <Compile Include="BPSettings.cs" />
-    <None Include="BPVesselModules.cs" />
+    <Compile Include="BPVesselModules.cs" />
+    <None Include="ThermalEngine.cs" />
+    <None Include="AblativeEngine.cs" />
+    <Compile Include="PhotonSail.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

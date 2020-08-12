@@ -17,8 +17,11 @@ namespace BeamedPowerStandalone
         [GameParameters.CustomIntParameterUI("Heat modifier %", unlockedDuringMission = false, minValue = 0, maxValue = 100, stepSize = 1)]
         public int PercentHeat = 20;
 
+        [GameParameters.CustomIntParameterUI("Photon-sail thrust multiplier", unlockedDuringMission = false, minValue = 0, maxValue = 1000, stepSize = 1)]
+        public int photonthrust = 10;
+
         [GameParameters.CustomParameterUI("Background Vessel Processing", unlockedDuringMission = false)]
-        public bool BackgroundProcessing = true;
+        public bool BackgroundProcessing = false;
 
         public override void SetDifficultyPreset(GameParameters.Preset preset)
         {

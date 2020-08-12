@@ -1,10 +1,10 @@
 ﻿using System;
-using System.IO;
-using System.Text;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace BeamedPowerStandalone
 {
+    [KSPAddon(KSPAddon.Startup.SpaceCentre, true)]
     public class WirelessSource : PartModule
     {
         // creating things on part right click menu (flight)
@@ -17,56 +17,60 @@ namespace BeamedPowerStandalone
         [KSPField(guiName = "Power to Beam", isPersistant = true, guiActive = true, guiActiveEditor = false, guiUnits = "EC/s"), UI_FloatRange(minValue = 0, maxValue = 100000, stepIncrement = 1, scene = UI_Scene.Flight)]
         public float powerBeamed;
 
-        // variables whose values (if they have one) are written to savefile
-        [KSPField(isPersistant = true)]
-        public string TransmittingTo;
-
         [KSPField(isPersistant = true)]
         public float constant;
 
-        // 'dish_diameter', 'efficiency', and 'wavelength' are set in part .cfg file:
+        [KSPField(guiName = "Transmitting To", isPersistant = true, guiActive = true, guiActiveEditor = false)]
+        public string TransmittingTo;
+
+        // 'dish_diameter', 'efficiency', and 'wavelength' are set in part.cfg file:
         [KSPField(isPersistant = false)]
         public float DishDiameter;
 
-        [KSPField(isPersistant = false)]
+        [KSPField(isPersistant = true)]
         public string Wavelength;
 
         [KSPField(isPersistant = false)]
         public float Efficiency;
 
+        List<ConfigNode> receiversList; int frames;
+
+        public void Start()
+        {
+            counter = (counter == null) ? counter = 0 : counter;
+            frames = 145;
+            receiversList = new List<ConfigNode>();
+        }
+
+        [KSPField(isPersistant = true)]
+        public int? counter;
+
+        [KSPEvent(guiName = "Cycle through vessels", guiActive = true, isPersistent = false, requireFullControl = true)]
+        public void VesselCounter()
+        {
+            counter = (counter < receiversList.Count - 1) ? counter += 1 : counter = 0;
+        }
+
         // getting resource id of 'Electric Charge'
-        public int EChash = PartResourceLibrary.Instance.GetDefinition("ElectricCharge").id; int frames = 0;
+        public int EChash = PartResourceLibrary.Instance.GetDefinition("ElectricCharge").id;
 
         // setting action group capability
         [KSPAction(guiName = "Toggle Power Transmitter")]
         public void ToggleBPTransmitter(KSPActionParam param)
         {
-            if (Transmitting == true)
-            {
-                Transmitting = false;
-            }
-            else
-            {
-                Transmitting = true;
-            }
+            Transmitting = Transmitting ? false : true;
         }
 
         [KSPAction(guiName = "Activate Power Transmitter")]
         public void ActivateBPTransmitter(KSPActionParam param)
         {
-            if (Transmitting == false)
-            {
-                Transmitting = true;
-            }
+            Transmitting = Transmitting ? true : true;
         }
 
         [KSPAction(guiName = "Deactivate Power Transmitter")]
         public void DeactivateBPTransmitter(KSPActionParam param)
         {
-            if (Transmitting == true)
-            {
-                Transmitting = false;
-            }
+            Transmitting = Transmitting ? false : false;
         }
 
         // adding part info to part description tab in editor
@@ -83,111 +87,94 @@ namespace BeamedPowerStandalone
             return ("Dish Diameter: " + Convert.ToString(DishDiameter) + "\n" 
                 + "EM Wavelength: " + Convert.ToString(Wavelength) + "\n" 
                 + "Efficiency: " + Convert.ToString(Efficiency));
+        } 
+
+        // gets all receiver spacecraft's confignodes from savefile
+        private void LoadReceiverData()
+        {
+            ConfigNode Node = ConfigNode.Load(KSPUtil.ApplicationRootPath + "saves/" + HighLogic.SaveFolder + "/persistent.sfs");
+            ConfigNode FlightNode = Node.GetNode("GAME").GetNode("FLIGHTSTATE");
+            receiversList = new List<ConfigNode>();
+
+            foreach (ConfigNode vesselnode in FlightNode.GetNodes("VESSEL"))
+            {
+                foreach (ConfigNode partnode in vesselnode.GetNodes("PART"))
+                {
+                    if (partnode.HasNode("MODULE"))
+                    {
+                        foreach (ConfigNode module in partnode.GetNodes("MODULE"))
+                        {
+                            if (module.GetValue("name") == "WirelessReceiver" | module.GetValue("name") == "WirelessReceiverDirectional")
+                            {
+                                receiversList.Add(vesselnode);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // main block of code - runs every physics frame
         public void FixedUpdate()
         {
-            frames += 1;
-            if (frames == 30)
-            {
-                SaveNode();
-            }
-            if (TransmittingTo == null)
-            {
-                TransmittingTo = " ";
-            }
             if (Transmitting == true)
             {
+                frames += 1;
+                if (frames == 150)
+                {
+                    try
+                    {
+                        LoadReceiverData();
+                    }
+                    catch
+                    {
+                        Debug.Log("BeamedPowerStandalone.WirelessSource : Unable to load receiver vessel list.");
+                    }
+                    frames = 0;
+                }
+                try
+                {
+                    TransmittingTo = receiversList[Convert.ToInt32(counter)].GetValue("name");
+                }
+                catch
+                {
+                    TransmittingTo = "None";
+                }
+                
                 this.vessel.GetConnectedResourceTotals(EChash, out double amount, out _);
-                if (amount<1)
+                if (amount < 1)
                 {
                     powerBeamed = 0;
                 }
                 // a bunch of math
                 excess = Convert.ToSingle(Math.Round((powerBeamed * Efficiency), 1));
-                if (Wavelength == "Short")
+                if (Wavelength == "Short")      // short ultraviolet
                 {
                     constant = Convert.ToSingle((1.44 * 5 * Math.Pow(10, -8)) / DishDiameter);
                 }
-                else if (Wavelength == "Long")
+                else if (Wavelength == "Long")  // short microwave
                 {
                     constant = Convert.ToSingle((1.44 * Math.Pow(10, -3)) / DishDiameter);
                 }
                 else
                 {
-                    Debug.Log("Incorrect paramater for wavelength in part.cfg");
+                    Debug.Log("BeamedPowerStandalone.WirelessSource : Incorrect paramater for wavelength in part.cfg");
+                    constant = 0;
                 }
 
-                // reducing amount of EC in craft in each frame (makes it look like continuous EC consumption)
-                double resource_drain = powerBeamed * Time.fixedDeltaTime;
-                this.part.RequestResource(EChash, resource_drain);
+                BPSettings settings = new BPSettings();
+                if (settings.BackgroundProcessing == false)
+                {
+                    // reducing amount of EC in craft in each frame (makes it look like continuous EC consumption)
+                    double resource_drain = powerBeamed * Time.fixedDeltaTime;
+                    this.part.RequestResource(EChash, resource_drain);
+                }
             }
             if (Transmitting==false)
             {
                 excess = 0;
-                powerBeamed = 0;
             }
-        }
-
-        public void SaveNode()
-        {
-            frames = 0;
-            string filepath = KSPUtil.ApplicationRootPath + "GameData/BeamedPowerStandalone/PluginData/save.cfg";
-            FileInfo info = new FileInfo(filepath);
-            ConfigNode BPNode;
-            if (info.Length > 0)
-            {
-                BPNode = ConfigNode.Load(KSPUtil.ApplicationRootPath + "GameData/BeamedPowerStandalone/PluginData/save.cfg");
-            }
-            else
-            {
-                BPNode = new ConfigNode();
-            }
-            string vesselId = Convert.ToString(this.vessel.id); int n2 = 0;
-            while (n2 < BPNode.nodes.Count)
-            {
-                if (BPNode.nodes[n2].GetValue("vesselId") == vesselId)
-                {
-                    break;
-                }
-                n2 += 1;
-            }
-            ConfigNode CorrectNode = new ConfigNode();
-            if (n2 == BPNode.nodes.Count)
-            {
-                BPNode.AddNode("VESSEL", CorrectNode);
-            }
-            else
-            {
-                CorrectNode = BPNode.nodes[n2];
-            }
-            CorrectNode.SetValue("vesselId", vesselId, createIfNotFound: true);
-            CorrectNode.SetValue("wavelength", Wavelength, createIfNotFound: true);
-            CorrectNode.SetValue("excess", excess, createIfNotFound: true);
-            CorrectNode.SetValue("constant", constant, createIfNotFound: true);
-            CorrectNode.SetValue("TransmittingTo", "NoVessel", createIfNotFound: true);
-
-            // removes nodes that contain data about vessels that no longer exist
-            for (int a = 0; a < BPNode.nodes.Count; a++)
-            {
-                string vesselId2 = BPNode.nodes[a].GetValue("vesselId"); bool Found = false;
-                for (int b = 0; b < FlightGlobals.Vessels.Count; b++)
-                {
-                    if (vesselId2 == Convert.ToString(FlightGlobals.Vessels[b].id))
-                    {
-                        Found = true;
-                        break;
-                    }
-                }
-                if (Found == false)
-                {
-                    BPNode.RemoveNode(BPNode.nodes[a]);
-                }
-            }
-
-            BPNode.Save(KSPUtil.ApplicationRootPath + "GameData/BeamedPowerStandalone/PluginData/save.cfg", "Beamed Power");
-            //Saves the confignode to disk.
         }
     }
 }

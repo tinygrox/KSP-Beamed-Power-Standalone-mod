@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-//using CommNet.Occluders;
+using CommNet.Occluders;
 
 namespace BeamedPowerStandalone
 {
@@ -9,7 +9,6 @@ namespace BeamedPowerStandalone
     [KSPAddon(KSPAddon.Startup.SpaceCentre, true)]
     public class WirelessReceiverDirectional : PartModule
     {
-        public List<Vessel> CorrectVesselList;
         // UI-right click menu in flight
         [KSPField(guiName = "Power Receiver", isPersistant = true, guiActive = true, guiActiveEditor = false), UI_Toggle(scene = UI_Scene.Flight)]
         public bool Listening;
@@ -17,8 +16,8 @@ namespace BeamedPowerStandalone
         [KSPField(guiName = "Received Power Limiter", isPersistant = true, guiActive = true, guiActiveEditor = false), UI_FloatRange(minValue = 0, maxValue = 100, stepIncrement = 1, requireFullControl = true, scene = UI_Scene.Flight)]
         public float percentagePower;
 
-        [KSPField(guiName = "Received Power", isPersistant = false, guiActive = true, guiActiveEditor = false, guiUnits = "EC/s")]
-        public float received_power_ui;
+        [KSPField(guiName = "Received Power", isPersistant = true, guiActive = true, guiActiveEditor = false, guiUnits = "EC/s")]
+        public float receivedPower;
 
         [KSPField(guiName = "Receiving from", isPersistant = false, guiActive = true, guiActiveEditor = false)]
         public string CorrectVesselName;
@@ -31,69 +30,55 @@ namespace BeamedPowerStandalone
         public float recvEfficiency;
 
         // declaring frequently used variables
-        public Vector3d source; public Vector3d dest; ConfigNode BPNode;
-        public int frames; public int counter; double received_power;
-        public List<double> excessList; public List<double> constantList; public List<string> TargetList;
+        Vector3d source; Vector3d dest;
+        int frames; double received_power;
         readonly int EChash = PartResourceLibrary.Instance.GetDefinition("ElectricCharge").id;
-        // WirelessSource modulesource = new WirelessSource();
+        TransmitterVessel transmitter = new TransmitterVessel();
+
+        List<Vessel> CorrectVesselList;
+        List<double> excessList; 
+        List<double> constantList;
+        List<string> targetList;
+
+        [KSPField(isPersistant = true)]
+        public int? counter;
 
         public void Start()
         {
-            frames = 595;
-            counter = 0;
+            if (counter == null)
+            {
+                counter = 0;
+            }
+            frames = 145;
             CorrectVesselList = new List<Vessel>();
             excessList = new List<double>();
             constantList = new List<double>();
-            TargetList = new List<string>();
-            BPNode = new ConfigNode();
+            targetList = new List<string>();
         }
 
         [KSPEvent(guiName = "Cycle through vessels", guiActive = true, isPersistent = false, requireFullControl = true)]
         public void VesselCounter()
         {
-            if (CorrectVesselList.Count > 0)
-            {
-                if (counter < CorrectVesselList.Count - 1)
-                {
-                    counter += 1;
-                }
-                else
-                {
-                    counter = 0;
-                }
-            }
+            counter = (counter < CorrectVesselList.Count - 1) ? counter += 1 : counter = 0;
         }
 
         // setting action group capability
         [KSPAction(guiName = "Toggle Power Receiver")]
         public void ToggleBPReceiver(KSPActionParam param)
         {
-            if (Listening == true)
-            {
-                Listening = false;
-            }
-            else
-            {
-                Listening = true;
-            }
+            Listening = Listening ? false : true;
         }
 
         [KSPAction(guiName = "Activate Power Receiver")]
         public void ActivateBPReceiver(KSPActionParam param)
         {
-            if (Listening == false)
-            {
-                Listening = true;
-            }
+            Listening = Listening ? true : true;
         }
 
         [KSPAction(guiName = "Deactivate Power Receiver")]
         public void DeactivateBPReceiver(KSPActionParam param)
         {
-            if (Listening == true)
-            {
-                Listening = false;
-            }
+            Listening = Listening ? false : false;
         }
 
         // adding part info to part description tab in editor
@@ -112,74 +97,26 @@ namespace BeamedPowerStandalone
                 + "Receiver Type: Directional");
         }
 
-        // get if receiver is occluded from source by a celestial body (commented for now)
-        //public bool CheckifOccluded(Vessel inputSource, Vessel inputDest)
-        //{
-        //    source = inputSource.GetWorldPos3D();
-        //    dest = inputDest.GetWorldPos3D();
-        //    CelestialBody planet = new CelestialBody();
-        //    OccluderHorizonCulling objOccluders = new OccluderHorizonCulling(planet.GetTransform(), planet.Radius, planet.Radius, planet.Radius);
-        //    bool occluded = objOccluders.Raycast(source, dest);
-        //    return occluded;
-        //}
-
-        // Loading all vessels that have WirelessSource module, and adding them to a list to use later
-        private void LoadVesselsList()
-        {
-            BPNode = ConfigNode.Load(KSPUtil.ApplicationRootPath + "GameData/BeamedPowerStandalone/PluginData/save.cfg");
-            CorrectVesselList = new List<Vessel>();
-            excessList = new List<double>();
-            constantList = new List<double>();
-            TargetList = new List<string>();
-            frames = 0;
-            for (int x = 0; x < FlightGlobals.Vessels.Count; x++)
-            {
-                for (int n = 0; n < BPNode.nodes.Count; n++)
-                {
-                    string vesselId = BPNode.nodes[n].GetValue("vesselId");
-                    if (Convert.ToString(FlightGlobals.Vessels[x].id) == vesselId)
-                    {
-                        CorrectVesselList.Add(FlightGlobals.Vessels[x]);
-                        double excess1 = Convert.ToDouble(BPNode.nodes[n].GetValue("excess"));
-                        double excess2 = Convert.ToDouble(BPNode.nodes[n].GetValue("constant"));
-                        string Target = BPNode.nodes[n].GetValue("TransmittingTo");
-                        excessList.Add(excess1);
-                        constantList.Add(excess2);
-                        TargetList.Add(Target);
-                        break;
-                    }
-                }
-            }
-        }
-
         // main block of code - runs every physics frame
         public void FixedUpdate()
         {
             frames += 1;
-            if (frames == 600)
+            if (frames == 150)
             {
-                LoadVesselsList();
+                transmitter.LoadVessels(out CorrectVesselList, out excessList, out constantList, out targetList, out _);
+                frames = 0;
             }
+            int index = Convert.ToInt32(counter);
             if (CorrectVesselList.Count > 0)
             {
-                string vesselId = Convert.ToString(this.vessel.id);
-                if (Listening == true & (TargetList[counter] == "NoVessel" | TargetList[counter] == vesselId))
+                if (Listening == true & targetList[index] == this.vessel.GetDisplayName())
                 {
-                    for (int m = 0; m < BPNode.nodes.Count; m++)
-                    {
-                        string vessel2id = Convert.ToString(CorrectVesselList[counter].id);
-                        if (BPNode.nodes[m].GetValue("vesselId") == vessel2id)
-                        {
-                            BPNode.nodes[m].SetValue("TransmittingTo", vesselId);
-                        }
-                    }
-
                     dest = this.vessel.GetWorldPos3D();
-                    double excess2 = excessList[counter]; double constant2 = constantList[counter];
-                    CorrectVesselName = CorrectVesselList[counter].GetDisplayName();
-                    source = CorrectVesselList[counter].GetWorldPos3D();
+                    double excess2 = excessList[index]; double constant2 = constantList[index];
+                    CorrectVesselName = CorrectVesselList[index].GetDisplayName();
+                    source = CorrectVesselList[index].GetWorldPos3D();
                     double distance = Vector3d.Distance(source, dest);
-                    double spotsize = constant2 * distance; received_power = 0;
+                    double spotsize = constant2 * distance;
 
                     // adding EC that has been received
                     if (recvDiameter < spotsize)
@@ -196,28 +133,39 @@ namespace BeamedPowerStandalone
                         received_power = Math.Round(((recvEfficiency * excess2) * (percentagePower / 100)), 1);
                         //}
                     }
-                    this.part.RequestResource(EChash, -received_power * Time.fixedDeltaTime);
-                    received_power_ui = Convert.ToSingle(received_power);
+
+                    BPSettings settings = new BPSettings();
+                    if (settings.BackgroundProcessing == false)
+                    {
+                        this.part.RequestResource(EChash, -received_power * Time.fixedDeltaTime);
+                    }
+                    receivedPower = Convert.ToSingle(received_power);
                 }
                 else
                 {
-                    received_power_ui = 0;
+                    receivedPower = 0;
                     received_power = 0;
-                    for (int m = 0; m < BPNode.nodes.Count; m++)
-                    {
-                        string vessel2id = Convert.ToString(CorrectVesselList[counter].id);
-                        if (BPNode.nodes[m].GetValue("vesselId") == vessel2id)
-                        {
-                            BPNode.nodes[m].SetValue("TransmittingTo", "NoVessel");
-                        }
-                    }
                 }
             }
             else
             {
-                received_power_ui = 0;
                 received_power = 0;
+                receivedPower = 0;
             }
         }
     }
+
+    // get if receiver is occluded from source by a celestial body (commented for now)
+    //public class BPOcclusion : OccluderHorizonCulling
+    //{
+    //    public bool CheckifOccluded(Vessel inputSource, Vessel inputDest)
+    //    {
+    //        OccluderHorizonCulling horizonCulling = new OccluderHorizonCulling(transform, radiusXRecip, radiusYRecip, radiusZRecip);
+
+    //        Vector3d source = inputSource.GetWorldPos3D();
+    //        Vector3d dest = inputDest.GetWorldPos3D();
+    //        bool occluded = horizonCulling.Raycast(source, dest);
+    //        return occluded;
+    //    }
+    //}
 }

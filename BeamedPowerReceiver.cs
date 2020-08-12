@@ -26,50 +26,42 @@ namespace BeamedPowerStandalone
         public float recvEfficiency;
 
         // declaring frequently used variables
-        public Vector3d source; public Vector3d dest; double received_power;
-        public List<Vessel> CorrectVesselList; public int frames;
-        public List<double> excessList; public List<double> constantList;
+        Vector3d source; Vector3d dest; double received_power; int frames;
         readonly int EChash = PartResourceLibrary.Instance.GetDefinition("ElectricCharge").id;
-        // WirelessSource modulesource = new WirelessSource();
+        TransmitterVessel transmitter = new TransmitterVessel();
+        // BPOcclusion occlusion = new BPOcclusion();
+
+        List<Vessel> CorrectVesselList;
+        List<double> excessList;
+        List<double> constantList;
+        List<string> targetList;
 
         public void Start()
         {
-            frames = 595;
+            frames = 145;
             CorrectVesselList = new List<Vessel>();
             excessList = new List<double>();
             constantList = new List<double>();
+            targetList = new List<string>();
         }
 
         // setting action group capability
         [KSPAction(guiName = "Toggle Power Receiver")]
         public void ToggleBPReceiver(KSPActionParam param)
         {
-            if (Listening == true)
-            {
-                Listening = false;
-            }
-            else
-            {
-                Listening = true;
-            }
+            Listening = Listening ? false : true;
         }
 
         [KSPAction(guiName = "Activate Power Receiver")]
         public void ActivateBPReceiver(KSPActionParam param)
         {
-            if (Listening == false)
-            {
-                Listening = true;
-            }
+            Listening = Listening ? true : true;
         }
 
         [KSPAction(guiName = "Deactivate Power Receiver")]
         public void DeactivateBPReceiver(KSPActionParam param)
         {
-            if (Listening == true)
-            {
-                Listening = false;
-            }
+            Listening = Listening ? false : false;
         }
 
         // adding part info to part description tab in editor
@@ -88,40 +80,16 @@ namespace BeamedPowerStandalone
                 + "Receiver Type: Sphere");
         }
 
-        // Loading all vessels that have WirelessSource module, and adding them to a list to use later
-        private void LoadVesselsList()
-        {
-            ConfigNode BPNode = ConfigNode.Load(KSPUtil.ApplicationRootPath + "GameData/BeamedPowerStandalone/PluginData/save.cfg");
-            CorrectVesselList = new List<Vessel>();
-            excessList = new List<double>();
-            constantList = new List<double>();
-            frames = 0;
-            for (int x = 0; x < FlightGlobals.Vessels.Count; x++)
-            {
-                for (int n = 0; n < BPNode.nodes.Count; n++)
-                {
-                    string vesselId = BPNode.nodes[n].GetValue("persistentId");
-                    if (Convert.ToString(FlightGlobals.Vessels[x].id) == vesselId)
-                    {
-                        CorrectVesselList.Add(FlightGlobals.Vessels[x]);
-                        double excess1 = Convert.ToDouble(BPNode.nodes[n].GetValue("excess"));
-                        double excess2 = Convert.ToDouble(BPNode.nodes[n].GetValue("constant"));
-                        excessList.Add(excess1);
-                        constantList.Add(excess2);
-                        break;
-                    }
-                }
-            }
-        }
-
         // main block of code - runs every physics frame
         public void FixedUpdate()
         {
             frames += 1;
-            if (frames == 600)
+            if (frames == 150)
             {
-                LoadVesselsList();
+                transmitter.LoadVessels(out CorrectVesselList, out excessList, out constantList, out targetList, out _);
+                frames = 0;
             }
+            
             if (CorrectVesselList.Count > 0)
             {
                 if (Listening == true)
@@ -132,28 +100,35 @@ namespace BeamedPowerStandalone
                     // adds up all the received power values from all vessels in CorrectVesselList 
                     for (int n = 0; n < CorrectVesselList.Count; n++)
                     {
-                        double excess2 = excessList[n]; double constant2 = constantList[n];
-                        source = CorrectVesselList[n].GetWorldPos3D();
-                        double distance = Vector3d.Distance(source, dest);
-                        double spotsize = constant2 * distance;
+                        if (targetList[n] == this.vessel.GetDisplayName())
+                        {
+                            double excess2 = excessList[n]; double constant2 = constantList[n];
+                            source = CorrectVesselList[n].GetWorldPos3D();
+                            double distance = Vector3d.Distance(source, dest);
+                            double spotsize = constant2 * distance;
 
-                        // adding EC that has been received
-                        if (recvDiameter < spotsize)
-                        {
-                            //if (DirectionalClass.CheckifOccluded(CorrectVesselList[n], this.vessel)==false)
-                            //{
-                            received_power += Math.Round(((recvDiameter / spotsize) * recvEfficiency * excess2 * (percentagePower / 100)), 1);
-                            //}
-                        }
-                        else
-                        {
-                            //if (DirectionalClass.CheckifOccluded(CorrectVesselList[n], this.vessel) == false)
-                            //{
-                            received_power += Math.Round(((recvEfficiency * excess2) * (percentagePower / 100)), 1);
-                            //}
+                            // adding EC that has been received
+                            if (recvDiameter < spotsize)
+                            {
+                                //if (DirectionalClass.CheckifOccluded(CorrectVesselList[n], this.vessel)==false)
+                                //{
+                                received_power += Math.Round(((recvDiameter / spotsize) * recvEfficiency * excess2 * (percentagePower / 100)), 1);
+                                //}
+                            }
+                            else
+                            {
+                                //if (DirectionalClass.CheckifOccluded(CorrectVesselList[n], this.vessel) == false)
+                                //{
+                                received_power += Math.Round(((recvEfficiency * excess2) * (percentagePower / 100)), 1);
+                                //}
+                            }
                         }
                     }
-                    this.part.RequestResource(EChash, -received_power * Time.fixedDeltaTime);
+                    BPSettings settings = new BPSettings();
+                    if (settings.BackgroundProcessing == false)
+                    {
+                        this.part.RequestResource(EChash, -received_power * Time.fixedDeltaTime);
+                    }
                     received_power_ui = Convert.ToSingle(received_power);
                 }
                 else
@@ -168,6 +143,49 @@ namespace BeamedPowerStandalone
                 received_power = 0;
             }
         }
+    }
+
+    public class TransmitterVessel
+    {
+        // Loading all vessels that have WirelessSource module, and adding them to a list to use later
+        public void LoadVessels(out List<Vessel> list1, out List<double> list2, out List<double> list3, out List<string> list4, out List<string> list5)
+        {
+            ConfigNode Node = ConfigNode.Load(KSPUtil.ApplicationRootPath + "saves/" + HighLogic.SaveFolder + "/persistent.sfs");
+            ConfigNode FlightNode = Node.GetNode("GAME").GetNode("FLIGHTSTATE");
+            list1 = new List<Vessel>(); list2 = new List<double>();
+            list3 = new List<double>(); list4 = new List<string>();
+            list5 = new List<string>();
+
+            foreach (ConfigNode vesselnode in FlightNode.GetNodes("VESSEL"))
+            {
+                foreach (ConfigNode partnode in vesselnode.GetNodes("PART"))
+                {
+                    if (partnode.HasNode("MODULE"))
+                    {
+                        foreach (ConfigNode module in partnode.GetNodes("MODULE"))
+                        {
+                            if (module.GetValue("name") == "WirelessSource")
+                            {
+                                list2.Add(Convert.ToDouble(module.GetValue("excess")));
+                                list3.Add(Convert.ToDouble(module.GetValue("constant")));
+                                list4.Add(module.GetValue("TransmittingTo"));
+                                list5.Add(module.GetValue("Wavelength"));
+                                foreach (Vessel vessel in FlightGlobals.Vessels)
+                                {
+                                    if (vesselnode.GetValue("name") == vessel.GetDisplayName())
+                                    {
+                                        list1.Add(vessel);
+                                        break;
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
     }
 }
  
