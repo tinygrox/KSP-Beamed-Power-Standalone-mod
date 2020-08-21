@@ -5,7 +5,6 @@ using UnityEngine;
 namespace BeamedPowerStandalone
 {
     // Part module for spherical or multi-directional receivers
-    // code relating to planetary occlusion has been commented out for now
     public class WirelessReceiver : PartModule
     {
         // UI-right click menu in flight
@@ -15,8 +14,20 @@ namespace BeamedPowerStandalone
         [KSPField(guiName = "Received Power Limiter", isPersistant = true, guiActive = true, guiActiveEditor = false), UI_FloatRange(minValue = 0, maxValue = 100, stepIncrement = 1, requireFullControl = true, scene = UI_Scene.Flight)]
         public float percentagePower;
 
-        [KSPField(guiName = "Received Power", isPersistant = false, guiActive = true, guiActiveEditor = false, guiUnits = "EC/s")]
-        public float received_power_ui;
+        [KSPField(guiName = "Received Power", isPersistant = true, guiActive = true, guiActiveEditor = false, guiUnits = "EC/s")]
+        public float receivedPower;
+
+        [KSPField(guiName = "Status", isPersistant = false, guiActive = true, guiActiveEditor = false)]
+        public string state;
+
+        [KSPField(guiName = "Core Temperature", groupName = "HeatInfo", groupDisplayName = "Heat Info", groupStartCollapsed = false, guiActive = true, guiActiveEditor = false, isPersistant = false, guiUnits = "K/900K")]
+        public float coreTemp;
+
+        [KSPField(guiName = "Skin Temperature", groupName = "HeatInfo", guiActive = true, guiActiveEditor = false, isPersistant = false, guiUnits = "K/1200K")]
+        public float skinTemp;
+
+        [KSPField(guiName = "Waste Heat", groupName = "HeatInfo", guiActive = true, guiActiveEditor = false, isPersistant = false, guiUnits = "kW")]
+        public float wasteHeat;
 
         // 'recv_diameter' and 'recv_efficiency' values are set in part cfg file
         [KSPField(isPersistant = false)]
@@ -26,10 +37,10 @@ namespace BeamedPowerStandalone
         public float recvEfficiency;
 
         // declaring frequently used variables
-        Vector3d source; Vector3d dest; double received_power; int frames;
+        Vector3d source; Vector3d dest; double received_power; int frames; int initFrames;
         readonly int EChash = PartResourceLibrary.Instance.GetDefinition("ElectricCharge").id;
-        TransmitterVessel transmitter = new TransmitterVessel();
-        // BPOcclusion occlusion = new BPOcclusion();
+        VesselFinder vesselFinder = new VesselFinder(); ModuleCoreHeat coreHeat;
+        AnimationSync animation; //BPOcclusion occlusion = new BPOcclusion();
 
         List<Vessel> CorrectVesselList;
         List<double> excessList;
@@ -38,11 +49,24 @@ namespace BeamedPowerStandalone
 
         public void Start()
         {
-            frames = 145;
+            frames = 145; initFrames = 0;
             CorrectVesselList = new List<Vessel>();
             excessList = new List<double>();
             constantList = new List<double>();
             targetList = new List<string>();
+            wavelength_ui = "Long";
+            animation = new AnimationSync();
+            SetHeatParams();
+        }
+
+        private void SetHeatParams()
+        {
+            this.part.AddModule("ModuleCoreHeat");
+            coreHeat = this.part.Modules.GetModule<ModuleCoreHeat>();
+            coreHeat.CoreTempGoal = 1300d;  // placeholder value, there is no optimum temperature
+            coreHeat.CoolantTransferMultiplier *= 3d;
+            coreHeat.radiatorCoolingFactor *= 2d;
+            coreHeat.HeatRadiantMultiplier *= 2d;
         }
 
         // setting action group capability
@@ -67,7 +91,7 @@ namespace BeamedPowerStandalone
         // adding part info to part description tab in editor
         public string GetModuleTitle()
         {
-            return "Wireless Source";
+            return "WirelessReceiver";
         }
         public override string GetModuleDisplayName()
         {
@@ -75,9 +99,36 @@ namespace BeamedPowerStandalone
         }
         public override string GetInfo()
         {
-            return ("Dish Diameter: " + Convert.ToString(recvDiameter) + "\n"
-                + "Efficiency: " + Convert.ToString(recvEfficiency) + "\n"
-                + "Receiver Type: Sphere");
+            return ("Receiver Type: Sphere" + "\n"
+                + "Dish Diameter: " + Convert.ToString(recvDiameter) + "m" + "\n"
+                + "Efficiency: " + Convert.ToString(recvEfficiency * 100) + "%" + "\n" + "" + "\n"
+                + "Max Core Temp: 900K" + "\n"
+                + "Max Skin Temp: 1200K" + "\n" + "" + "\n"
+                + "This receiver will shutdown past these temperatures.");
+        }
+
+        private void AddHeatToCore()
+        {
+            coreTemp = (float)(Math.Round(coreHeat.CoreTemperature, 1));
+            skinTemp = (float)(Math.Round(this.part.skinTemperature, 1));
+            if (coreTemp > 900f | skinTemp > 1200f)
+            {
+                state = "Exceeded Temperature Limit";
+                Listening = (Listening) ? false : false;
+            }
+            if (state == "Exceeded Temperature Limit" & (coreTemp > 700f | skinTemp > 1000f))
+            {
+                Listening = (Listening) ? false : false;
+            }
+            if (coreTemp < 700f & skinTemp < 1000f)
+            {
+                state = "Operational";
+            }
+            double heatModifier = (double)HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().PercentHeat / 100;
+            double heatExcess = (1 - recvEfficiency) * (received_power / recvEfficiency) * heatModifier;
+            wasteHeat = (float)Math.Round(heatExcess, 1);
+            coreHeat.AddEnergyToCore(heatExcess * 0.3 * 3 * Time.fixedDeltaTime);  // first converted to kJ
+            this.part.AddSkinThermalFlux(heatExcess * 0.7);     // some heat added to skin
         }
 
         // main block of code - runs every physics frame
@@ -86,10 +137,19 @@ namespace BeamedPowerStandalone
             frames += 1;
             if (frames == 150)
             {
-                transmitter.LoadVessels(out CorrectVesselList, out excessList, out constantList, out targetList, out _);
+                vesselFinder.SourceData(out CorrectVesselList, out excessList, out constantList, out targetList, out _);
                 frames = 0;
             }
-            
+            if (initFrames < 60)
+            {
+                initFrames += 1;
+            }
+            else
+            {
+                AddHeatToCore();
+            }
+            animation.SyncAnimationState(this.part);
+
             if (CorrectVesselList.Count > 0)
             {
                 if (Listening == true)
@@ -106,86 +166,82 @@ namespace BeamedPowerStandalone
                             source = CorrectVesselList[n].GetWorldPos3D();
                             double distance = Vector3d.Distance(source, dest);
                             double spotsize = constant2 * distance;
+                            //occlusion.CheckIfOccluded(CorrectVesselList[n], this.vessel, out _, out bool occluded);
 
                             // adding EC that has been received
                             if (recvDiameter < spotsize)
                             {
-                                //if (DirectionalClass.CheckifOccluded(CorrectVesselList[n], this.vessel)==false)
+                                //if (occluded == false)
                                 //{
                                 received_power += Math.Round(((recvDiameter / spotsize) * recvEfficiency * excess2 * (percentagePower / 100)), 1);
                                 //}
                             }
                             else
                             {
-                                //if (DirectionalClass.CheckifOccluded(CorrectVesselList[n], this.vessel) == false)
+                                //if (occluded == false)
                                 //{
                                 received_power += Math.Round(((recvEfficiency * excess2) * (percentagePower / 100)), 1);
                                 //}
                             }
                         }
                     }
-                    BPSettings settings = new BPSettings();
-                    if (settings.BackgroundProcessing == false)
+
+                    if (HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().BackgroundProcessing == false)
                     {
                         this.part.RequestResource(EChash, -received_power * Time.fixedDeltaTime);
                     }
-                    received_power_ui = Convert.ToSingle(received_power);
+                    receivedPower = Convert.ToSingle(received_power);
                 }
                 else
                 {
-                    received_power_ui = 0;
+                    receivedPower = 0;
                     received_power = 0;
                 }
             }
             else
             {
-                received_power_ui = 0;
+                receivedPower = 0;
                 received_power = 0;
             }
         }
-    }
 
-    public class TransmitterVessel
-    {
-        // Loading all vessels that have WirelessSource module, and adding them to a list to use later
-        public void LoadVessels(out List<Vessel> list1, out List<double> list2, out List<double> list3, out List<string> list4, out List<string> list5)
+        // adds received power calculator to receivers right-click menu in editor
+
+        [KSPField(guiName = "Distance", groupName = "calculator2", groupDisplayName = "Received Power Calculator", groupStartCollapsed = true, guiUnits = "Mm", guiActive = false, guiActiveEditor = true), UI_FloatRange(minValue = 0, maxValue = 20000000, stepIncrement = 0.001f, scene = UI_Scene.Editor)]
+        public float dist_ui;
+
+        [KSPField(guiName = "Source Dish Diameter", groupName = "calculator2", guiUnits = "m", guiActive = false, guiActiveEditor = true), UI_FloatRange(minValue = 0, maxValue = 100, stepIncrement = 0.5f, scene = UI_Scene.Editor)]
+        public float dish_dia_ui;
+
+        [KSPField(guiName = "Source Efficiency", groupName = "calculator2", guiActive = false, guiActiveEditor = true, guiUnits = "%"), UI_FloatRange(minValue = 0, maxValue = 100, stepIncrement = 1, scene = UI_Scene.Editor)]
+        public float efficiency;
+
+        [KSPField(guiName = "Power Beamed", groupName = "calculator2", guiUnits = "EC/s", guiActive = false, guiActiveEditor = true), UI_FloatRange(minValue = 0, maxValue = 100000, stepIncrement = 1, scene = UI_Scene.Editor)]
+        public float beamedPower;
+
+        [KSPField(guiName = "Result", groupName = "calculator2", guiUnits = "EC/s", guiActive = false, guiActiveEditor = true)]
+        public float powerReceived;
+
+        [KSPField(guiName = "Beamed Wavelength", groupName = "calculator2", guiActiveEditor = true, guiActive = false)]
+        public string wavelength_ui;
+
+        [KSPEvent(guiName = "Toggle Wavelength", guiActive = false, guiActiveEditor = true, groupName = "calculator2")]
+        public void ToggleWavelength()
         {
-            ConfigNode Node = ConfigNode.Load(KSPUtil.ApplicationRootPath + "saves/" + HighLogic.SaveFolder + "/persistent.sfs");
-            ConfigNode FlightNode = Node.GetNode("GAME").GetNode("FLIGHTSTATE");
-            list1 = new List<Vessel>(); list2 = new List<double>();
-            list3 = new List<double>(); list4 = new List<string>();
-            list5 = new List<string>();
-
-            foreach (ConfigNode vesselnode in FlightNode.GetNodes("VESSEL"))
-            {
-                foreach (ConfigNode partnode in vesselnode.GetNodes("PART"))
-                {
-                    if (partnode.HasNode("MODULE"))
-                    {
-                        foreach (ConfigNode module in partnode.GetNodes("MODULE"))
-                        {
-                            if (module.GetValue("name") == "WirelessSource")
-                            {
-                                list2.Add(Convert.ToDouble(module.GetValue("excess")));
-                                list3.Add(Convert.ToDouble(module.GetValue("constant")));
-                                list4.Add(module.GetValue("TransmittingTo"));
-                                list5.Add(module.GetValue("Wavelength"));
-                                foreach (Vessel vessel in FlightGlobals.Vessels)
-                                {
-                                    if (vesselnode.GetValue("name") == vessel.GetDisplayName())
-                                    {
-                                        list1.Add(vessel);
-                                        break;
-                                    }
-                                }
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
+            wavelength_ui = (wavelength_ui == "Long") ? "Short" : "Long";
         }
 
+        public void Update()
+        {
+            if (HighLogic.LoadedSceneIsEditor)
+            {
+                float wavelength_num = (float)((wavelength_ui == "Long") ? Math.Pow(10, -3) : 5 * Math.Pow(10, -8));
+                float spot_size = (float)(1.44 * wavelength_num * dist_ui * 1000000 / dish_dia_ui);
+                powerReceived = (spot_size > recvDiameter) ?
+                    recvDiameter / spot_size * beamedPower * (efficiency / 100) * recvEfficiency : beamedPower * (efficiency / 100) * recvEfficiency;
+                powerReceived = (float)Math.Round(powerReceived, 1);
+            }
+        }
     }
 }
  

@@ -34,10 +34,12 @@
     <StartupObject />
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Assembly-CSharp">
+    <Reference Include="Assembly-CSharp, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Kerbal Space Program\KSP_x64_Data\Managed\Assembly-CSharp.dll</HintPath>
     </Reference>
-    <Reference Include="Assembly-CSharp-firstpass">
+    <Reference Include="Assembly-CSharp-firstpass, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Kerbal Space Program\KSP_x64_Data\Managed\Assembly-CSharp-firstpass.dll</HintPath>
     </Reference>
     <Reference Include="System" />
@@ -56,11 +58,13 @@
     <Compile Include="BeamedPowerReceiver.cs" />
     <Compile Include="BeamedPowerReceiverDirectional.cs" />
     <Compile Include="BeamedPowerSource.cs" />
-    <Compile Include="BPSettings.cs" />
-    <Compile Include="BPVesselModules.cs" />
+    <Compile Include="Settings.cs" />
+    <Compile Include="VesselModule.cs" />
     <None Include="ThermalEngine.cs" />
     <None Include="AblativeEngine.cs" />
+    <None Include="BeamedPowerReflector.cs" />
     <Compile Include="PhotonSail.cs" />
+    <Compile Include="UsefulClasses.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

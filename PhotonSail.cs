@@ -10,6 +10,12 @@ namespace BeamedPowerStandalone
         [KSPField(guiName = "Received power", guiActive = true, guiActiveEditor = false, guiUnits = "kW")]
         public float received_power_ui;
 
+        [KSPField(guiName = "Current Thrust", guiActive = true, guiActiveEditor = false, guiUnits = "N")]
+        public float thrust_ui;
+
+        [KSPField(guiName = "Current Acceleration", guiActive = true, guiActiveEditor = false, guiUnits = "mm/s²")]
+        public float acceleration;
+
         // parameters set in part.cfg
         [KSPField(isPersistant = false)]
         public float SurfaceArea;
@@ -23,20 +29,48 @@ namespace BeamedPowerStandalone
         Vector3d source; Vector3d dest;
         List<Vessel> VesselsList; List<string> targetList;
         List<double> excessList; List<double> constantList;
-        List<string> wavelengthList; int frames;
-        TransmitterVessel transmitter = new TransmitterVessel();
+        List<string> wavelengthList; int frames; ModuleEnginesFX engines;
+        VesselFinder vesselFinder = new VesselFinder(); AnimationSync animation;
+        RelativeOrientation rotation = new RelativeOrientation();
 
-        public double momentum;
-        public double photonCount;
-        public double received_power;
-
+        // a lot of the usual part.cfg parameters for engines are now set within the code itself
         public void Start()
         {
-            frames = 295;
+            frames = 145;
             VesselsList = new List<Vessel>();
             excessList = new List<double>();
             constantList = new List<double>();
             wavelengthList = new List<string>();
+            animation = new AnimationSync();
+            SetEngineParams();
+        }
+
+        private void SetEngineParams()
+        {
+            this.part.AddModule("ModuleEnginesFX");
+            engines = this.part.Modules.GetModule<ModuleEnginesFX>();
+            engines.engineID = "BPPS";
+            engines.minThrust = 0;
+            engines.throttleLocked = true;
+            engines.allowShutdown = false;
+            engines.allowRestart = false;
+            engines.exhaustDamage = false;
+            engines.engineType = EngineType.Generic;
+
+            engines.atmosphereCurve = new FloatCurve();
+            engines.atmosphereCurve.Add(0, 30592000);
+            engines.atmosphereCurve.Add(1, 29000000);
+            engines.atmosphereCurve.Add(5, 21000000);
+            
+            
+            Propellant fuel = new Propellant();
+            fuel.name = "Photons";
+            fuel.displayName = "Photons";
+            fuel.ratio = 1f;
+            fuel.drawStackGauge = false;
+            engines.propellants = new List<Propellant>();
+            engines.propellants.Add(fuel);
+            this.part.Resources.Add("Photons", 10, 10, true, false, true, false, PartResource.FlowMode.Both);
         }
 
         // adding part info to part description tab in editor
@@ -50,27 +84,29 @@ namespace BeamedPowerStandalone
         }
         public override string GetInfo()
         {
-            return ("Surface Area: " + Convert.ToString(SurfaceArea) + "\n"
-                + "Reflectivity: " + Convert.ToString(Reflectivity) + "\n"
+            return ("Surface Area: " + Convert.ToString(SurfaceArea) + "m²" + "\n"
+                + "Reflectivity: " + Convert.ToString(Reflectivity * 100) + "%" + "\n"
                 + "Wavelength: " + Convert.ToString(Wavelength));
         }
 
-        
-
         public void FixedUpdate()
         {
+            double momentum = 0;
+            double photonCount = 0;
+            double received_power = 0;
+
             frames += 1;
-            if (frames == 300)
+            if (frames == 150)
             {
-                transmitter.LoadVessels(out VesselsList, out excessList, out constantList, out targetList, out wavelengthList);
+                vesselFinder.SourceData(out VesselsList, out excessList, out constantList, out targetList, out wavelengthList);
                 frames = 0;
             }
+            acceleration = (float)Math.Round(this.vessel.acceleration.magnitude / 1000, 3);
+            animation.SyncAnimationState(this.part);
 
             if (VesselsList.Count > 0)
             {
                 dest = this.vessel.GetWorldPos3D();
-                received_power = 0;
-
                 // adds up all the received power values from all vessels in CorrectVesselList 
                 for (int n = 0; n < VesselsList.Count; n++)
                 {
@@ -79,27 +115,28 @@ namespace BeamedPowerStandalone
                         double excess2 = excessList[n]; double constant2 = constantList[n];
                         source = VesselsList[n].GetWorldPos3D();
                         double distance = Vector3d.Distance(source, dest);
-                        double spot_area = Math.Pow(constant2 * distance, 2) * Math.PI;
+                        double spot_area = Math.Pow((constant2 * distance) / 2, 2) * 3.14;
+                        double flux = rotation.FractionalFlux(source, dest, this.vessel, this.part);
 
                         // adding EC that has been received
                         if (SurfaceArea < spot_area)
                         {
                             //if (DirectionalClass.CheckifOccluded(CorrectVesselList[n], this.vessel)==false)
                             //{
-                            received_power += Math.Round(SurfaceArea / spot_area * excess2);
+                            received_power += flux * Math.Round(SurfaceArea / spot_area * excess2);
                             //}
                         }
                         else
                         {
                             //if (DirectionalClass.CheckifOccluded(CorrectVesselList[n], this.vessel) == false)
                             //{
-                            received_power += Math.Round(excess2, 1);
+                            received_power += flux * Math.Round(excess2, 1);
                             //}
                         }
                     }
                 }
-                RelativeOrientation rotation = new RelativeOrientation();
-                received_power *= rotation.FractionalFlux(source, dest, this.vessel);
+                animation.SyncAnimationState(this.part);
+
                 received_power_ui = (float)Math.Round(received_power, 1);
                 double lambda;
                 if (Wavelength == "Long")
@@ -112,52 +149,68 @@ namespace BeamedPowerStandalone
                 }
                 else
                 {
-                    lambda = 0;
-                    Debug.Log("BeamedPowerStandalone.PhotonSail : Unknown Wavelength type received.");
+                    lambda = 1;
+                    Debug.LogError("BeamedPowerStandalone.PhotonSail : Unknown Wavelength type received.");
                 }
                 double h = 6.62607004 * Math.Pow(10, -34);  // planck's constant
                 momentum = h / lambda;
-                photonCount = received_power / h * (3 * Math.Pow(10, 8) / lambda);
+                photonCount = received_power * 1000 / (h * (3 * Math.Pow(10, 8) / lambda));
             }
             else
             {
                 received_power = 0;
+                received_power_ui = 0;
             }
-        }
-    }
 
-    public class RelativeOrientation
-    {
-        public double FractionalFlux(Vector3d source_pos, Vector3d dest_pos, Vessel vessel)
-        {
-            Vector3d resultant = source_pos - dest_pos;
-            Vector3d upvector = vessel.upAxis;
-            double Angle = Vector3d.Angle(resultant, upvector);
-            double flux = (Angle < 90 & Angle > -90) ? flux = Math.Cos(Angle) : flux = 0;
-            return flux;
+            double heatModifier = HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().PercentHeat;
+            float Thrust = (float)(momentum * photonCount * Reflectivity);
+            engines.heatProduction = (float)((1 - Reflectivity) * received_power * ((heatModifier / 100) * 0.7));
+            engines.maxThrust = Thrust * HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().photonthrust;
+            thrust_ui = engines.GetMaxThrust() * 1000;
+            double fuel_rate = engines.maxThrust * 1000 / (9.81 * 3 * Math.Pow(10, 8));
+            this.part.RequestResource("Photons", -fuel_rate * Time.fixedDeltaTime); // increases quantity of the photons resource
         }
-    }
 
-    public class PhotonEngine : ModuleEnginesFX
-    {
-        [KSPField(guiName = "Thrust", guiActive = true, guiActiveEditor = false, guiUnits = "N")]
-        public float thrust_ui;
+        // thrust calculator
+        [KSPField(guiName = "Distance", groupName = "calculator4", groupDisplayName = "Thrust Calculator", groupStartCollapsed = true, guiUnits = "Mm", guiActive = false, guiActiveEditor = true), UI_FloatRange(minValue = 0, maxValue = 20000000, stepIncrement = 0.001f, scene = UI_Scene.Editor)]
+        public float dist_ui;
 
-        public void Start()
+        [KSPField(guiName = "Source Dish Diameter", groupName = "calculator4", guiUnits = "m", guiActive = false, guiActiveEditor = true), UI_FloatRange(minValue = 0, maxValue = 100, stepIncrement = 0.5f, scene = UI_Scene.Editor)]
+        public float dish_dia_ui;
+
+        [KSPField(guiName = "Source Efficiency", groupName = "calculator4", guiActive = false, guiActiveEditor = true, guiUnits = "%"), UI_FloatRange(minValue = 0, maxValue = 100, stepIncrement = 1, scene = UI_Scene.Editor)]
+        public float efficiency;
+
+        [KSPField(guiName = "Power Beamed", groupName = "calculator4", guiUnits = "EC/s", guiActive = false, guiActiveEditor = true), UI_FloatRange(minValue = 0, maxValue = 100000, stepIncrement = 1, scene = UI_Scene.Editor)]
+        public float beamedPower;
+
+        [KSPField(guiName = "Thrust", groupName = "calculator4", guiUnits = "N", guiActive = false, guiActiveEditor = true)]
+        public float Thrust2;
+
+        [KSPField(guiName = "Beamed Wavelength", groupName = "calculator4", guiActiveEditor = true, guiActive = false)]
+        public string wavelength_ui;
+
+        [KSPEvent(guiName = "Toggle Wavelength", guiActive = false, guiActiveEditor = true, groupName = "calculator4")]
+        public void ToggleWavelength()
         {
-            engineID = "BPPS";
-            minThrust = 0;
-            throttleLocked = true;
-            allowShutdown = false;
-            useEngineResponseTime = false;
+            wavelength_ui = (wavelength_ui == "Long") ? "Short" : "Long";
         }
-        public void FixedUpdate()
+
+        public void Update()
         {
-            PhotonSail sail = new PhotonSail(); BPSettings settings = new BPSettings();
-            float Thrust = (float)(sail.momentum * sail.photonCount * sail.Reflectivity);
-            heatProduction = (float)((1 - sail.Reflectivity) * sail.received_power * (settings.PercentHeat / 100));
-            maxThrust = Thrust * settings.photonthrust;
-            thrust_ui = GetCurrentThrust();
+            if (HighLogic.LoadedSceneIsEditor)
+            {
+                float wavelength_num2 = (float)((wavelength_ui == "Long") ? Math.Pow(10, -3) : 5 * Math.Pow(10, -8));
+                float spotArea2 = (float)(Math.Pow((1.44 * wavelength_num2 * dist_ui * 1000000 / dish_dia_ui), 2) * 3.14);
+                double powerReceived2 = (spotArea2 > SurfaceArea) ?
+                    SurfaceArea / spotArea2 * beamedPower * (efficiency / 100) : beamedPower * (efficiency / 100);
+
+                double h2 = 6.62607 * Math.Pow(10, -34);  // planck's constant
+                double momentum2 = h2 / wavelength_num2;
+                double photonCount = powerReceived2 * 1000 / (h2 * (3 * Math.Pow(10, 8) / wavelength_num2));
+                Thrust2 = (float)(momentum2 * photonCount * Reflectivity * HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().photonthrust);
+                Thrust2 = (float)Math.Round(Thrust2, 3);
+            }
         }
     }
 }

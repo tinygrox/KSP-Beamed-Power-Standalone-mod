@@ -8,7 +8,7 @@ namespace BeamedPowerStandalone
     {
         public void FixedUpdate()
         {
-            // module for thermal engines powere by beamed power (no EC involved), yet to do.
+            // module for thermal engines powered by beamed power (no EC involved), yet to do.
 			// not compiled into released .dll
         }
     }
