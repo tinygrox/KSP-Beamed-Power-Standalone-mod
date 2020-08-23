@@ -29,7 +29,7 @@ namespace BeamedPowerStandalone
         Vector3d source; Vector3d dest;
         List<Vessel> VesselsList; List<string> targetList;
         List<double> excessList; List<double> constantList;
-        List<string> wavelengthList; int frames; ModuleEnginesFX engines;
+        List<string> wavelengthList; int frames; ModuleEngines engines;
         VesselFinder vesselFinder = new VesselFinder(); AnimationSync animation;
         RelativeOrientation rotation = new RelativeOrientation();
 
@@ -47,8 +47,8 @@ namespace BeamedPowerStandalone
 
         private void SetEngineParams()
         {
-            this.part.AddModule("ModuleEnginesFX");
-            engines = this.part.Modules.GetModule<ModuleEnginesFX>();
+            this.part.AddModule("ModuleEngines");
+            engines = this.part.Modules.GetModule<ModuleEngines>();
             engines.engineID = "BPPS";
             engines.minThrust = 0;
             engines.throttleLocked = true;

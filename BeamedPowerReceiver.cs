@@ -40,12 +40,13 @@ namespace BeamedPowerStandalone
         Vector3d source; Vector3d dest; double received_power; int frames; int initFrames;
         readonly int EChash = PartResourceLibrary.Instance.GetDefinition("ElectricCharge").id;
         VesselFinder vesselFinder = new VesselFinder(); ModuleCoreHeat coreHeat;
-        AnimationSync animation; //BPOcclusion occlusion = new BPOcclusion();
+        AnimationSync animation; OcclusionData occlusion = new OcclusionData();
 
         List<Vessel> CorrectVesselList;
         List<double> excessList;
         List<double> constantList;
         List<string> targetList;
+        List<string> wavelenghtList;
 
         public void Start()
         {
@@ -54,6 +55,7 @@ namespace BeamedPowerStandalone
             excessList = new List<double>();
             constantList = new List<double>();
             targetList = new List<string>();
+            wavelenghtList = new List<string>();
             wavelength_ui = "Long";
             animation = new AnimationSync();
             SetHeatParams();
@@ -127,7 +129,7 @@ namespace BeamedPowerStandalone
             double heatModifier = (double)HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().PercentHeat / 100;
             double heatExcess = (1 - recvEfficiency) * (received_power / recvEfficiency) * heatModifier;
             wasteHeat = (float)Math.Round(heatExcess, 1);
-            coreHeat.AddEnergyToCore(heatExcess * 0.3 * 3 * Time.fixedDeltaTime);  // first converted to kJ
+            coreHeat.AddEnergyToCore(heatExcess * 0.3 * 2 * Time.fixedDeltaTime);  // first converted to kJ
             this.part.AddSkinThermalFlux(heatExcess * 0.7);     // some heat added to skin
         }
 
@@ -137,7 +139,7 @@ namespace BeamedPowerStandalone
             frames += 1;
             if (frames == 150)
             {
-                vesselFinder.SourceData(out CorrectVesselList, out excessList, out constantList, out targetList, out _);
+                vesselFinder.SourceData(out CorrectVesselList, out excessList, out constantList, out targetList, out wavelenghtList);
                 frames = 0;
             }
             if (initFrames < 60)
@@ -166,22 +168,22 @@ namespace BeamedPowerStandalone
                             source = CorrectVesselList[n].GetWorldPos3D();
                             double distance = Vector3d.Distance(source, dest);
                             double spotsize = constant2 * distance;
-                            //occlusion.CheckIfOccluded(CorrectVesselList[n], this.vessel, out _, out bool occluded);
+                            occlusion.IsOccluded(source, dest, wavelenghtList[n], out _, out bool occluded);
 
                             // adding EC that has been received
                             if (recvDiameter < spotsize)
                             {
-                                //if (occluded == false)
-                                //{
-                                received_power += Math.Round(((recvDiameter / spotsize) * recvEfficiency * excess2 * (percentagePower / 100)), 1);
-                                //}
+                                if (occluded == false)
+                                {
+                                    received_power += Math.Round(((recvDiameter / spotsize) * recvEfficiency * excess2 * (percentagePower / 100)), 1);
+                                }
                             }
                             else
                             {
-                                //if (occluded == false)
-                                //{
-                                received_power += Math.Round(((recvEfficiency * excess2) * (percentagePower / 100)), 1);
-                                //}
+                                if (occluded == false)
+                                {
+                                    received_power += Math.Round(((recvEfficiency * excess2) * (percentagePower / 100)), 1);
+                                }
                             }
                         }
                     }

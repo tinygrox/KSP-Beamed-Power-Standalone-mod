@@ -11,7 +11,10 @@ namespace BeamedPowerStandalone
         public override string Section { get { return "Beamed Power"; } }
         public override string DisplaySection { get { return "Beamed Power"; } }
         public override int SectionOrder { get { return 1; } }
-        public override bool HasPresets { get { return true; } } 
+        public override bool HasPresets { get { return true; } }
+
+        [GameParameters.CustomParameterUI("Planetary Occlusion", unlockedDuringMission = false)]
+        public bool planetOcclusion = true;
 
         [GameParameters.CustomIntParameterUI("Heat modifier %", unlockedDuringMission = false, minValue = 0, maxValue = 100, stepSize = 1)]
         public int PercentHeat = 50;

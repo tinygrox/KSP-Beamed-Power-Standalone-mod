@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using CommNet.Occluders;
 
 namespace BeamedPowerStandalone
 {
@@ -43,12 +44,13 @@ namespace BeamedPowerStandalone
         int frames; double received_power; int initFrames;
         readonly int EChash = PartResourceLibrary.Instance.GetDefinition("ElectricCharge").id;
         VesselFinder vesselFinder = new VesselFinder(); ModuleCoreHeat coreHeat;
-        AnimationSync animation;
+        AnimationSync animation; OcclusionData occlusion = new OcclusionData();
 
         List <Vessel> CorrectVesselList;
         List<double> excessList; 
         List<double> constantList;
         List<string> targetList;
+        List<string> wavelengthList;
 
         [KSPField(isPersistant = true)]
         public int counter = 0;
@@ -61,6 +63,7 @@ namespace BeamedPowerStandalone
             excessList = new List<double>();
             constantList = new List<double>();
             targetList = new List<string>();
+            wavelengthList = new List<string>();
             wavelength_ui = "Long";
             animation = new AnimationSync();
             SetEngineParams();
@@ -141,29 +144,8 @@ namespace BeamedPowerStandalone
             double heatModifier = (double)HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().PercentHeat / 100;
             double heatExcess = (1 - recvEfficiency) * (received_power / recvEfficiency) * heatModifier;
             wasteHeat = (float)Math.Round(heatExcess, 1);
-            coreHeat.AddEnergyToCore(heatExcess * 0.3 * 3 * Time.fixedDeltaTime);  // first converted to kJ
+            coreHeat.AddEnergyToCore(heatExcess * 0.3 * 2 * Time.fixedDeltaTime);  // first converted to kJ
             this.part.AddSkinThermalFlux(heatExcess * 0.7);     // some heat added to skin
-        }
-
-        // checks for occlusion by celestial body, uses derived class constructor BPOcclusion
-        private void IsOccluded(out CelestialBody celestialBody, out bool occluded)
-        {
-            Transform transform2; double radiusx2; double radiusy2; double radiusz2;
-            celestialBody = new CelestialBody(); occluded = false;
-            for (int x = 0; x < FlightGlobals.Bodies.Count; x++)
-            {
-                transform2 = FlightGlobals.Bodies[x].transform;
-                radiusx2 = FlightGlobals.Bodies[x].Radius;
-                radiusy2 = FlightGlobals.Bodies[x].Radius;
-                radiusz2 = FlightGlobals.Bodies[x].Radius;
-                celestialBody = FlightGlobals.Bodies[x];
-                BPOcclusion occlusion = new BPOcclusion(transform2, radiusx2, radiusy2, radiusz2, celestialBody);
-                occluded = occlusion.Raycast(source, dest);
-                if (occluded == true)
-                {
-                    break;
-                }
-            }
         }
 
         // main block of code - runs every physics frame
@@ -172,7 +154,7 @@ namespace BeamedPowerStandalone
             frames += 1;
             if (frames == 150)
             {
-                vesselFinder.SourceData(out CorrectVesselList, out excessList, out constantList, out targetList, out _);
+                vesselFinder.SourceData(out CorrectVesselList, out excessList, out constantList, out targetList, out wavelengthList);
                 frames = 0;
             }
             if (initFrames < 60)
@@ -196,7 +178,7 @@ namespace BeamedPowerStandalone
                     double distance = Vector3d.Distance(source, dest);
                     double spotsize = constant2 * distance;
 
-                    IsOccluded(out CelestialBody celestial, out bool isOccluded);
+                    occlusion.IsOccluded(source, dest, wavelengthList[counter], out CelestialBody celestial, out bool isOccluded);
 
                     // adding EC that has been received
                     if (recvDiameter < spotsize)
@@ -209,8 +191,8 @@ namespace BeamedPowerStandalone
                     }
                     if (isOccluded == true)
                     {
-                        receivedPower = 0;
-                        state = "Occluded by " + celestial.GetDisplayName();
+                        received_power = 0;
+                        state = "Occluded by " + celestial.GetDisplayName().TrimEnd(Convert.ToChar("N")).TrimEnd(Convert.ToChar("^"));
                     }
 
                     if (HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().BackgroundProcessing == false)

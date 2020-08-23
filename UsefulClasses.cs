@@ -138,19 +138,33 @@ namespace BeamedPowerStandalone
         }
     }
 
-    // get if receiver is occluded from source by a celestial body
-    public class BPOcclusion : OccluderHorizonCulling
+    public class OcclusionData
     {
-        public BPOcclusion(Transform transform1, double radiusx1, double radiusy1, double radiusz1, CelestialBody body1) 
-            : base(transform1, radiusx1, radiusy1, radiusz1)
+        // checks for occlusion by each celestial body
+        public void IsOccluded(Vector3d source, Vector3d dest, string wavelength, out CelestialBody celestialBody, out bool occluded)
         {
-            transform = transform1;
-            radiusXRecip = radiusx1;
-            radiusYRecip = radiusy1;
-            radiusZRecip = radiusz1;
-            invRotation = transform1.rotation.Inverse();
-            body = body1;
-            useBody = true;
-        }  
+            bool planetocclusion = HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().planetOcclusion;
+            Transform transform2; double radius2; celestialBody = new CelestialBody(); occluded = new bool();
+
+            for (int x = 0; x < FlightGlobals.Bodies.Count; x++)
+            {
+                transform2 = FlightGlobals.Bodies[x].transform;
+                radius2 = FlightGlobals.Bodies[x].Radius;
+                celestialBody = FlightGlobals.Bodies[x];
+                radius2 *= (wavelength == "Long") ? 0.7 : 0.9;
+
+                OccluderHorizonCulling occlusion = new OccluderHorizonCulling(transform2, radius2, radius2, radius2);
+                occlusion.Update();
+                occluded = occlusion.Raycast(source, dest);
+                if (occluded == true)
+                {
+                    break;
+                }
+            }
+            if (planetocclusion == false)
+            {
+                occluded = false;
+            }
+        }
     }
 }

@@ -136,7 +136,7 @@ namespace BeamedPowerStandalone
             double heatModifier = (double)HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().PercentHeat / 100;
             double heatExcess = (1 - Efficiency) * (excess / Efficiency) * heatModifier;
             wasteHeat = (float)Math.Round(heatExcess, 1);
-            coreHeat.AddEnergyToCore(heatExcess * 0.7 * 4 * Time.fixedDeltaTime);  // first converted to kJ
+            coreHeat.AddEnergyToCore(heatExcess * 0.7 * 3 * Time.fixedDeltaTime);  // first converted to kJ
             part.AddSkinThermalFlux(heatExcess * 0.3);      // some heat added to skin
         }
 
