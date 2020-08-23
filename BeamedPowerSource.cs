@@ -214,7 +214,7 @@ namespace BeamedPowerStandalone
         }
 
         // adds received power calculator in transmitter part's right click menu in editor
-        [KSPField(guiName = "Distance", groupName = "calculator3", groupDisplayName = "Received Power Calculator", groupStartCollapsed = true, guiUnits = "Mm", guiActive = false, guiActiveEditor = true), UI_FloatRange(minValue = 0, maxValue = 20000000, stepIncrement = 0.001f, scene = UI_Scene.Editor)]
+        [KSPField(guiName = "Distance", groupName = "calculator3", groupDisplayName = "Received Power Calculator", groupStartCollapsed = true, guiUnits = "Mm", guiActive = false, guiActiveEditor = true), UI_FloatRange(minValue = 0, maxValue = 10000000, stepIncrement = 0.001f, scene = UI_Scene.Editor)]
         public float dist_ui;
 
         [KSPField(guiName = "Receiver Diameter", groupName = "calculator3", guiUnits = "m", guiActive = false, guiActiveEditor = true), UI_FloatRange(minValue = 0, maxValue = 50, stepIncrement = 0.5f, scene = UI_Scene.Editor)]

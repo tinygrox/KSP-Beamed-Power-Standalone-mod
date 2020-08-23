@@ -60,10 +60,10 @@
     <Compile Include="BeamedPowerSource.cs" />
     <Compile Include="Settings.cs" />
     <Compile Include="VesselModule.cs" />
-    <None Include="ThermalEngine.cs" />
+    <Compile Include="ThermalEngine.cs" />
     <None Include="AblativeEngine.cs" />
     <None Include="BeamedPowerReflector.cs" />
-    <Compile Include="PhotonSail.cs" />
+    <None Include="PhotonSail.cs" />
     <Compile Include="UsefulClasses.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

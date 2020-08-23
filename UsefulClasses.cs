@@ -88,6 +88,7 @@ namespace BeamedPowerStandalone
         }
     }
 
+    // syncs animation state (eg retracted/extended) with power received/transmitted
     public class AnimationSync
     {
         public void SyncAnimationState(Part part)
@@ -110,31 +111,16 @@ namespace BeamedPowerStandalone
                     }
                 }
             }
-            else if (part.Modules.Contains<ModuleDeployablePart>())
-            {
-                if (part.Modules.GetModule<ModuleDeployablePart>().deployState != ModuleDeployablePart.DeployState.EXTENDED)
-                {
-                    if (part.Modules.Contains<PhotonSail>())
-                    {
-                        part.Modules.GetModule<PhotonSail>().Fields.SetValue("received_power", 0f);
-                    }
-                }
-            }
-        }
-    }
-
-    public class RelativeOrientation
-    {
-        public double FractionalFlux(Vector3d source_pos, Vector3d dest_pos, Vessel receiver, Part recvPart)
-        {
-            Vector3 resultant = source_pos - dest_pos;
-            Vector3 upvector = receiver.upAxis;
-            Quaternion vesselRot = Quaternion.FromToRotation(resultant, upvector);
-            Quaternion partRotation = recvPart.attRotation;
-            Quaternion resRotation = vesselRot * partRotation;
-            resRotation.ToAngleAxis(out float Angle, out _);
-            double flux = (Angle < 90 &  Angle > -90) ? Math.Cos(Angle) : 0;
-            return flux;
+            //else if (part.Modules.Contains<ModuleDeployablePart>())
+            //{
+            //    if (part.Modules.GetModule<ModuleDeployablePart>().deployState != ModuleDeployablePart.DeployState.EXTENDED)
+            //    {
+            //        if (part.Modules.Contains<PhotonSail>())
+            //        {
+            //            part.Modules.GetModule<PhotonSail>().Fields.SetValue("received_power", 0f);
+            //        }
+            //    }
+            //}
         }
     }
 
@@ -165,6 +151,60 @@ namespace BeamedPowerStandalone
             {
                 occluded = false;
             }
+        }
+    }
+
+    // a class used for some of the propulsion modules
+    public class RelativeOrientation
+    {
+        public double FractionalFlux(Vector3d source_pos, Vector3d dest_pos, Vessel receiver, Part recvPart)
+        {
+            Vector3 resultant = source_pos - dest_pos;
+            Vector3 upvector = receiver.upAxis;
+            Quaternion vesselRot = Quaternion.FromToRotation(resultant, upvector);
+            Quaternion partRotation = recvPart.attRotation;
+            Quaternion resRotation = vesselRot * partRotation;
+            resRotation.ToAngleAxis(out float Angle, out _);
+            double flux = (Angle < 90 & Angle > -90) ? Math.Cos(Angle) : 0;
+            return flux;
+        }
+    }
+
+    public class ReceiverPowerCalc : PartModule
+    {
+        // adds received power calculator to receivers right-click menu in editor
+
+        [KSPField(guiName = "Distance", groupName = "calculator1", groupDisplayName = "Received Power Calculator", groupStartCollapsed = true, guiUnits = "Mm", guiActive = false, guiActiveEditor = true, isPersistant = false), UI_FloatRange(minValue = 0, maxValue = 10000000, stepIncrement = 0.001f, scene = UI_Scene.Editor)]
+        public float dist_ui;
+
+        [KSPField(guiName = "Source Dish Diameter", groupName = "calculator1", guiUnits = "m", guiActive = false, guiActiveEditor = true, isPersistant = false), UI_FloatRange(minValue = 0, maxValue = 100, stepIncrement = 0.5f, scene = UI_Scene.Editor)]
+        public float dish_dia_ui;
+
+        [KSPField(guiName = "Source Efficiency", groupName = "calculator1", guiActive = false, guiActiveEditor = true, guiUnits = "%", isPersistant = false), UI_FloatRange(minValue = 0, maxValue = 100, stepIncrement = 1, scene = UI_Scene.Editor)]
+        public float efficiency;
+
+        [KSPField(guiName = "Power Beamed", groupName = "calculator1", guiUnits = "EC/s", guiActive = false, guiActiveEditor = true, isPersistant = false), UI_FloatRange(minValue = 0, maxValue = 100000, stepIncrement = 1, scene = UI_Scene.Editor)]
+        public float beamedPower;
+
+        [KSPField(guiName = "Result", groupName = "calculator1", guiUnits = "EC/s", guiActive = false, guiActiveEditor = true, isPersistant = false)]
+        public float powerReceived;
+
+        [KSPField(guiName = "Beamed Wavelength", groupName = "calculator1", guiActiveEditor = true, guiActive = false, isPersistant = false)]
+        public string wavelength_ui;
+
+        [KSPEvent(guiName = "Toggle Wavelength", guiActive = false, guiActiveEditor = true, groupName = "calculator1", isPersistent = false)]
+        public void ToggleWavelength()
+        {
+            wavelength_ui = (wavelength_ui == "Long") ? "Short" : "Long";
+        }
+
+        public void CalculatePower(float recvDia, float recvefficiency)
+        {
+            float wavelength_num = (float)((wavelength_ui == "Long") ? Math.Pow(10, -3) : 5 * Math.Pow(10, -8));
+            float spot_size = (float)(1.44 * wavelength_num * dist_ui * 1000000 / dish_dia_ui);
+            powerReceived = (spot_size > recvDia) ?
+                recvDia / spot_size * beamedPower * (efficiency / 100) * recvefficiency : beamedPower * (efficiency / 100) * recvefficiency;
+            powerReceived = (float)Math.Round(powerReceived, 1);
         }
     }
 }

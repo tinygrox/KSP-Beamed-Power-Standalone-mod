@@ -41,6 +41,7 @@ namespace BeamedPowerStandalone
         readonly int EChash = PartResourceLibrary.Instance.GetDefinition("ElectricCharge").id;
         VesselFinder vesselFinder = new VesselFinder(); ModuleCoreHeat coreHeat;
         AnimationSync animation; OcclusionData occlusion = new OcclusionData();
+        ReceiverPowerCalc calc;
 
         List<Vessel> CorrectVesselList;
         List<double> excessList;
@@ -51,12 +52,13 @@ namespace BeamedPowerStandalone
         public void Start()
         {
             frames = 145; initFrames = 0;
+            this.part.AddModule("ReceiverPowerCalc");
+            calc = this.part.Modules.GetModule<ReceiverPowerCalc>();
             CorrectVesselList = new List<Vessel>();
             excessList = new List<double>();
             constantList = new List<double>();
             targetList = new List<string>();
             wavelenghtList = new List<string>();
-            wavelength_ui = "Long";
             animation = new AnimationSync();
             SetHeatParams();
         }
@@ -192,7 +194,7 @@ namespace BeamedPowerStandalone
                     {
                         this.part.RequestResource(EChash, -received_power * Time.fixedDeltaTime);
                     }
-                    receivedPower = Convert.ToSingle(received_power);
+                    receivedPower = Convert.ToSingle(Math.Round(received_power, 1));
                 }
                 else
                 {
@@ -207,41 +209,11 @@ namespace BeamedPowerStandalone
             }
         }
 
-        // adds received power calculator to receivers right-click menu in editor
-
-        [KSPField(guiName = "Distance", groupName = "calculator2", groupDisplayName = "Received Power Calculator", groupStartCollapsed = true, guiUnits = "Mm", guiActive = false, guiActiveEditor = true), UI_FloatRange(minValue = 0, maxValue = 20000000, stepIncrement = 0.001f, scene = UI_Scene.Editor)]
-        public float dist_ui;
-
-        [KSPField(guiName = "Source Dish Diameter", groupName = "calculator2", guiUnits = "m", guiActive = false, guiActiveEditor = true), UI_FloatRange(minValue = 0, maxValue = 100, stepIncrement = 0.5f, scene = UI_Scene.Editor)]
-        public float dish_dia_ui;
-
-        [KSPField(guiName = "Source Efficiency", groupName = "calculator2", guiActive = false, guiActiveEditor = true, guiUnits = "%"), UI_FloatRange(minValue = 0, maxValue = 100, stepIncrement = 1, scene = UI_Scene.Editor)]
-        public float efficiency;
-
-        [KSPField(guiName = "Power Beamed", groupName = "calculator2", guiUnits = "EC/s", guiActive = false, guiActiveEditor = true), UI_FloatRange(minValue = 0, maxValue = 100000, stepIncrement = 1, scene = UI_Scene.Editor)]
-        public float beamedPower;
-
-        [KSPField(guiName = "Result", groupName = "calculator2", guiUnits = "EC/s", guiActive = false, guiActiveEditor = true)]
-        public float powerReceived;
-
-        [KSPField(guiName = "Beamed Wavelength", groupName = "calculator2", guiActiveEditor = true, guiActive = false)]
-        public string wavelength_ui;
-
-        [KSPEvent(guiName = "Toggle Wavelength", guiActive = false, guiActiveEditor = true, groupName = "calculator2")]
-        public void ToggleWavelength()
-        {
-            wavelength_ui = (wavelength_ui == "Long") ? "Short" : "Long";
-        }
-
         public void Update()
         {
             if (HighLogic.LoadedSceneIsEditor)
             {
-                float wavelength_num = (float)((wavelength_ui == "Long") ? Math.Pow(10, -3) : 5 * Math.Pow(10, -8));
-                float spot_size = (float)(1.44 * wavelength_num * dist_ui * 1000000 / dish_dia_ui);
-                powerReceived = (spot_size > recvDiameter) ?
-                    recvDiameter / spot_size * beamedPower * (efficiency / 100) * recvEfficiency : beamedPower * (efficiency / 100) * recvEfficiency;
-                powerReceived = (float)Math.Round(powerReceived, 1);
+                calc.CalculatePower(recvDiameter, recvEfficiency);
             }
         }
     }
