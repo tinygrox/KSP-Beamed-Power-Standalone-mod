@@ -12,6 +12,7 @@ namespace BeamedPowerStandalone
         {
             ConfigNode Node = ConfigNode.Load(KSPUtil.ApplicationRootPath + "saves/" + HighLogic.SaveFolder + "/persistent.sfs");
             ConfigNode FlightNode = Node.GetNode("GAME").GetNode("FLIGHTSTATE");
+
             vesselList = new List<Vessel>(); excess = new List<double>();
             constant = new List<double>(); target = new List<string>();
             wave = new List<string>();
@@ -55,6 +56,20 @@ namespace BeamedPowerStandalone
                                 }
                                 break;
                             }
+                            else if (module.GetValue("name") == "BeamedPowerReflector")
+                            {
+                                foreach (Vessel vessel in FlightGlobals.Vessels)
+                                {
+                                    if (vesselnode.GetValue("name") == vessel.GetDisplayName())
+                                    {
+                                        vesselList.Add(vessel);
+                                        excess.Add(Convert.ToDouble(module.GetValue("excess")));
+                                        constant.Add(Convert.ToDouble(module.GetValue("constant")));
+                                        target.Add(module.GetValue("TransmittingTo"));
+                                        wave.Add(module.GetValue("Wavelength"));
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -66,6 +81,7 @@ namespace BeamedPowerStandalone
         {
             ConfigNode Node = ConfigNode.Load(KSPUtil.ApplicationRootPath + "saves/" + HighLogic.SaveFolder + "/persistent.sfs");
             ConfigNode FlightNode = Node.GetNode("GAME").GetNode("FLIGHTSTATE");
+
             receiversList = new List<ConfigNode>();
 
             foreach (ConfigNode vesselnode in FlightNode.GetNodes("VESSEL"))
@@ -77,6 +93,11 @@ namespace BeamedPowerStandalone
                         foreach (ConfigNode module in partnode.GetNodes("MODULE"))
                         {
                             if (module.GetValue("name") == "WirelessReceiver" | module.GetValue("name") == "WirelessReceiverDirectional")
+                            {
+                                receiversList.Add(vesselnode);
+                                break;
+                            }
+                            else if (module.GetValue("name") == "BeamedPowerReflector" | module.GetValue("name") == "ThermalEngine")
                             {
                                 receiversList.Add(vesselnode);
                                 break;
@@ -111,16 +132,16 @@ namespace BeamedPowerStandalone
                     }
                 }
             }
-            //else if (part.Modules.Contains<ModuleDeployablePart>())
-            //{
-            //    if (part.Modules.GetModule<ModuleDeployablePart>().deployState != ModuleDeployablePart.DeployState.EXTENDED)
-            //    {
-            //        if (part.Modules.Contains<PhotonSail>())
-            //        {
-            //            part.Modules.GetModule<PhotonSail>().Fields.SetValue("received_power", 0f);
-            //        }
-            //    }
-            //}
+            else if (part.Modules.Contains<ModuleDeployablePart>())
+            {
+                if (part.Modules.GetModule<ModuleDeployablePart>().deployState != ModuleDeployablePart.DeployState.EXTENDED)
+                {
+                    if (part.Modules.Contains<PhotonSail>())
+                    {
+                        part.Modules.GetModule<PhotonSail>().Fields.SetValue("received_power", 0f);
+                    }
+                }
+            }
         }
     }
 
@@ -167,6 +188,35 @@ namespace BeamedPowerStandalone
             resRotation.ToAngleAxis(out float Angle, out _);
             double flux = (Angle < 90 & Angle > -90) ? Math.Cos(Angle) : 0;
             return flux;
+        }
+    }
+
+    public class RelativisticEffects
+    {
+        public double ScalePowerRecv(double prevDist, double Dist, string state, out string status)
+        {
+            bool relativistic = HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().relativistic; double powerMult;
+            if (relativistic)
+            {
+                double v = (Dist - prevDist) / Time.fixedDeltaTime;  const float c = 299792452;   // v is radial velocity only
+                
+                if (v >= c - 1)
+                {
+                    powerMult = 0;
+                    status = "Exceeded Light Speed";
+                }
+                else
+                {
+                    powerMult = Math.Sqrt((1 + v / c) / (1 - v / c));
+                    status = state;
+                }
+            }
+            else
+            {
+                powerMult = 1;
+                status = state;
+            }
+            return powerMult;
         }
     }
 

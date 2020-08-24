@@ -22,6 +22,9 @@ namespace BeamedPowerStandalone
         [GameParameters.CustomIntParameterUI("Photon-sail thrust multiplier", unlockedDuringMission = true, minValue = 0, maxValue = 1000, stepSize = 1)]
         public int photonthrust = 40;
 
+        [GameParameters.CustomParameterUI("Some Relativistic Effects", unlockedDuringMission = false)]
+        public bool relativistic = false;
+
         [GameParameters.CustomParameterUI("Background Vessel Processing", unlockedDuringMission = false)]
         public bool BackgroundProcessing = false;
 
@@ -31,22 +34,23 @@ namespace BeamedPowerStandalone
             {
                 case GameParameters.Preset.Easy:
                     PercentHeat = 0;
-                    photonthrust = 500;
+                    photonthrust = 1000;
+                    planetOcclusion = false;
                     break;
 
                 case GameParameters.Preset.Normal:
                     PercentHeat = 30;
-                    photonthrust = 100;
+                    photonthrust = 500;
                     break;
 
                 case GameParameters.Preset.Moderate:
                     PercentHeat = 60;
-                    photonthrust = 40;
+                    photonthrust = 100;
                     break;
 
                 case GameParameters.Preset.Hard:
                     PercentHeat = 90;
-                    photonthrust = 10;
+                    photonthrust = 40;
                     break;
 
                 case GameParameters.Preset.Custom:

@@ -10,7 +10,7 @@ namespace BeamedPowerStandalone
         [KSPField(guiName = "Power Receiver", isPersistant = true, guiActive = true, guiActiveEditor = false), UI_Toggle(scene = UI_Scene.Flight)]
         public bool Listening;
 
-        [KSPField(guiName = "Received Power Limiter", isPersistant = true, guiActive = true, guiActiveEditor = false), UI_FloatRange(minValue = 0, maxValue = 100, stepIncrement = 1, requireFullControl = true, scene = UI_Scene.Flight)]
+        [KSPField(guiName = "Received Power Limiter", isPersistant = true, guiActive = true, guiActiveEditor = false, guiUnits = "%"), UI_FloatRange(minValue = 0, maxValue = 100, stepIncrement = 1, requireFullControl = true, scene = UI_Scene.Flight)]
         public float percentagePower;
 
         [KSPField(guiName = "Received Power", isPersistant = true, guiActive = true, guiActiveEditor = false, guiUnits = "EC/s")]
@@ -39,11 +39,11 @@ namespace BeamedPowerStandalone
         public float recvEfficiency;
 
         // declaring frequently used variables
-        Vector3d source; Vector3d dest; int frames; double received_power; int initFrames;
+        Vector3d source; Vector3d dest; int frames; double received_power; int initFrames; double distance;
         readonly int EChash = PartResourceLibrary.Instance.GetDefinition("ElectricCharge").id;
         VesselFinder vesselFinder = new VesselFinder(); ModuleCoreHeat coreHeat;
         AnimationSync animation; OcclusionData occlusion = new OcclusionData();
-        ReceiverPowerCalc calc;
+        RelativisticEffects relativistic = new RelativisticEffects(); ReceiverPowerCalc calc;
 
         List <Vessel> CorrectVesselList;
         List<double> excessList; 
@@ -56,7 +56,7 @@ namespace BeamedPowerStandalone
 
         public void Start()
         {
-            frames = 145; initFrames = 0;
+            frames = 145; initFrames = 0; distance = 10;
             this.part.AddModule("ReceiverPowerCalc");
             calc = this.part.Modules.GetModule<ReceiverPowerCalc>();
             CorrectVesselList = new List<Vessel>();
@@ -170,11 +170,11 @@ namespace BeamedPowerStandalone
             {
                 if (Listening == true & targetList[counter] == this.vessel.GetDisplayName())
                 {
-                    dest = this.vessel.GetWorldPos3D();
+                    dest = this.vessel.GetWorldPos3D(); double prevDist = distance;
                     double excess2 = excessList[counter]; double constant2 = constantList[counter];
                     CorrectVesselName = CorrectVesselList[counter].GetDisplayName();
                     source = CorrectVesselList[counter].GetWorldPos3D();
-                    double distance = Vector3d.Distance(source, dest);
+                    distance = Vector3d.Distance(source, dest);
                     double spotsize = constant2 * distance;
 
                     occlusion.IsOccluded(source, dest, wavelengthList[counter], out CelestialBody celestial, out bool isOccluded);
@@ -193,6 +193,8 @@ namespace BeamedPowerStandalone
                         received_power = 0;
                         state = "Occluded by " + celestial.GetDisplayName().TrimEnd(Convert.ToChar("N")).TrimEnd(Convert.ToChar("^"));
                     }
+
+                    received_power *= relativistic.ScalePowerRecv(prevDist, distance, state, out state);
 
                     if (HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().BackgroundProcessing == false)
                     {

@@ -6,12 +6,18 @@ namespace BeamedPowerStandalone
 {
     public class BeamedPowerReflector : PartModule
     {
-        // Reflectivity set in part.cfg file
+        // parameters set in part.cfg file
         [KSPField(isPersistant = false)]
         public float Reflectivity;
 
         [KSPField(isPersistant = false)]
         public float ReflectorDiameter;
+
+        [KSPField(isPersistant = false)]
+        public float Efficiency;
+
+        [KSPField(isPersistant = false)]
+        public bool CanAmplify;
 
         // counter variables used to cycle through transmitter and receiver lists respectively
         [KSPField(isPersistant = true)]
@@ -27,6 +33,16 @@ namespace BeamedPowerStandalone
         [KSPField(isPersistant = true)]
         public float constant;
 
+        [KSPField(isPersistant = true)]
+        public string Wavelength;
+
+        // reflector specific variables
+        [KSPField(guiName = "Power Reflected", guiActive = true, guiActiveEditor = false, isPersistant = false, guiUnits = "kW")]
+        public float powerReflected;
+
+        [KSPField(guiName = "Amplify power", guiActive = true, guiActiveEditor = false, isPersistant = false, guiUnits = "x"), UI_FloatRange(minValue = 1, maxValue = 5, stepIncrement = 0.01f, scene = UI_Scene.Flight)]
+        public float amplifyMult;
+
         // adding vessel names for 'from' and 'to' to part right-click menu in flight
         [KSPField(guiName = "From", guiActive = true, guiActiveEditor = false, isPersistant = false)]
         public string transmitterName;
@@ -38,7 +54,7 @@ namespace BeamedPowerStandalone
         List<Vessel> TransmitterList; int frames; List<ConfigNode> receiverConfigList;
         List<double> excessList; List<double> constantList; List<string> targetList;  List<string> wavelengthList;
         VesselFinder vesselFinder = new VesselFinder();
-        //BPOcclusion occlusion = new BPOcclusion();
+        OcclusionData occlusion = new OcclusionData();
 
         // KSPEvent buttons to cycle through vessels lists
         [KSPEvent(guiName = "Cycle through transmitter vessels", guiActive = true, guiActiveEditor = false, requireFullControl = true)]
@@ -87,7 +103,6 @@ namespace BeamedPowerStandalone
         {
             if (frames == 150)
             {
-                
                 vesselFinder.SourceData(out TransmitterList, out excessList, out constantList, out targetList, out wavelengthList);
                 vesselFinder.ReceiverData(out receiverConfigList);
                 frames = 0;
@@ -106,7 +121,7 @@ namespace BeamedPowerStandalone
                     Vector3d dest = TransmitterList[transmitterCount].GetWorldPos3D();
                     double distance = Vector3d.Distance(source, dest);
                     double spot_size = constant1 * distance;
-                    //occlusion.CheckIfOccluded(TransmitterList[transmitterCount], this.vessel, out _, out bool occluded);
+                    occlusion.IsOccluded(source, dest, wavelengthList[transmitterCount], out CelestialBody celestial, out bool occluded);
 
                     if (spot_size > ReflectorDiameter)
                     {
@@ -116,18 +131,27 @@ namespace BeamedPowerStandalone
                     {
                         excess = (float)Math.Round((Reflectivity * excess1), 1);
                     }
-                    //if (occluded)
-                    //{
-                    //    excess = 0;
-                    //}
+                    if (occluded)
+                    {
+                        excess = 0;
+                    }
+                    if (CanAmplify)
+                    {
+                        this.part.RequestResource("ElectricCharge", (double)((excess * amplifyMult) / Efficiency - excess));
+                        excess *= amplifyMult;
+                    }
+
+                    powerReflected = Convert.ToSingle(Math.Round(excess, 1));
 
                     if (wavelengthList[transmitterCount] == "Short")
                     {
                         constant = Convert.ToSingle((1.44 * 5 * Math.Pow(10, -8)) / ReflectorDiameter);
+                        Wavelength = "Short";
                     }
                     else
                     {
                         constant = Convert.ToSingle((1.44 * Math.Pow(10, -3)) / ReflectorDiameter);
+                        Wavelength = "Long";
                     }
                 }
             }
