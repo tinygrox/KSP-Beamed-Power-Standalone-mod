@@ -8,8 +8,10 @@ namespace BeamedPowerStandalone
     public class BackgroundProcessing : VesselModule
     {
         int EChash; int frames; double requestAmount;
-        public new void Start()
+
+        public override void OnLoadVessel()
         {
+            base.OnLoadVessel();
             EChash = PartResourceLibrary.Instance.GetDefinition("ElectricCharge").id; frames = 0; requestAmount = 0;
         }
 
@@ -66,7 +68,7 @@ namespace BeamedPowerStandalone
             }
             if (HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().BackgroundProcessing == true)
             {
-                this.vessel.RequestResource(this.vessel.parts[0], EChash, requestAmount, false);
+                this.vessel.RequestResource(this.vessel.Parts[0], EChash, requestAmount, false);
             }
         }
     }

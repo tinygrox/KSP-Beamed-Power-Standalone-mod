@@ -19,60 +19,79 @@ namespace BeamedPowerStandalone
 
             foreach (ConfigNode vesselnode in FlightNode.GetNodes("VESSEL"))
             {
-                foreach (ConfigNode partnode in vesselnode.GetNodes("PART"))
-                {
-                    if (partnode.HasNode("MODULE"))
-                    {
-                        foreach (ConfigNode module in partnode.GetNodes("MODULE"))
+               foreach (ConfigNode partnode in vesselnode.GetNodes("PART"))
+               {
+                  if (partnode.HasNode("MODULE"))
+                  {
+                     foreach (ConfigNode module in partnode.GetNodes("MODULE"))
+                     {
+                        if (module.GetValue("name") == "WirelessSource")
                         {
-                            if (module.GetValue("name") == "WirelessSource")
-                            {
-                                foreach (Vessel vessel in FlightGlobals.Vessels)
-                                {
-                                    if (vesselnode.GetValue("name") == vessel.GetDisplayName())
+                           foreach (Vessel vessel in FlightGlobals.Vessels)
+                           {
+                              if (vesselnode.GetValue("name") == vessel.GetDisplayName())
+                              {
+                                 vesselList.Add(vessel);
+                                 if (vessel.loaded)
+                                 {
+                                    foreach (Part part in vessel.Parts)
                                     {
-                                        vesselList.Add(vessel);
-                                        if (vessel.loaded)
-                                        {
-                                            foreach (Part part in vessel.Parts)
-                                            {
-                                                if (part.Modules.Contains<WirelessSource>())
-                                                {
-                                                    excess.Add(Convert.ToDouble(part.Modules.GetModule<WirelessSource>().Fields.GetValue("excess")));
-                                                    constant.Add(Convert.ToDouble(part.Modules.GetModule<WirelessSource>().Fields.GetValue("constant")));
-                                                    target.Add(Convert.ToString(part.Modules.GetModule<WirelessSource>().Fields.GetValue("TransmittingTo")));
-                                                    wave.Add(Convert.ToString(part.Modules.GetModule<WirelessSource>().Fields.GetValue("Wavelength")));
-                                                }
-                                            }
-                                        }
-                                        else
-                                        {
-                                            excess.Add(Convert.ToDouble(module.GetValue("excess")));
-                                            constant.Add(Convert.ToDouble(module.GetValue("constant")));
-                                            target.Add(module.GetValue("TransmittingTo"));
-                                            wave.Add(module.GetValue("Wavelength"));
-                                        }
+                                       if (part.Modules.Contains<WirelessSource>())
+                                       {
+                                          excess.Add(Convert.ToDouble(part.Modules.GetModule<WirelessSource>().Fields.GetValue("excess")));
+                                          constant.Add(Convert.ToDouble(part.Modules.GetModule<WirelessSource>().Fields.GetValue("constant")));
+                                          target.Add(Convert.ToString(part.Modules.GetModule<WirelessSource>().Fields.GetValue("TransmittingTo")));
+                                          wave.Add(Convert.ToString(part.Modules.GetModule<WirelessSource>().Fields.GetValue("Wavelength")));
+                                          break;
+                                       }
                                     }
-                                }
-                                break;
-                            }
-                            else if (module.GetValue("name") == "BeamedPowerReflector")
-                            {
-                                foreach (Vessel vessel in FlightGlobals.Vessels)
-                                {
-                                    if (vesselnode.GetValue("name") == vessel.GetDisplayName())
-                                    {
-                                        vesselList.Add(vessel);
-                                        excess.Add(Convert.ToDouble(module.GetValue("excess")));
-                                        constant.Add(Convert.ToDouble(module.GetValue("constant")));
-                                        target.Add(module.GetValue("TransmittingTo"));
-                                        wave.Add(module.GetValue("Wavelength"));
-                                    }
-                                }
-                            }
+                                 }
+                                 else
+                                 {
+                                    excess.Add(Convert.ToDouble(module.GetValue("excess")));
+                                    constant.Add(Convert.ToDouble(module.GetValue("constant")));
+                                    target.Add(module.GetValue("TransmittingTo"));
+                                    wave.Add(module.GetValue("Wavelength"));
+                                 }
+                                 break;
+                              }
+                           }
+                           break;
                         }
-                    }
-                }
+                        else if (module.GetValue("name") == "WirelessReflector")
+                        {
+                           foreach (Vessel vessel in FlightGlobals.Vessels)
+                           {
+                              if (vesselnode.GetValue("name") == vessel.GetDisplayName())
+                              {
+                                 vesselList.Add(vessel);
+                                 if (vessel.loaded)
+                                 {
+                                    foreach (Part part in vessel.Parts)
+                                    {
+                                       if (part.Modules.Contains<WirelessReflector>())
+                                       {
+                                          excess.Add(Convert.ToDouble(part.Modules.GetModule<WirelessReflector>().Fields.GetValue("excess")));
+                                          constant.Add(Convert.ToDouble(part.Modules.GetModule<WirelessReflector>().Fields.GetValue("constant")));
+                                          target.Add(Convert.ToString(part.Modules.GetModule<WirelessReflector>().Fields.GetValue("TransmittingTo")));
+                                          wave.Add(Convert.ToString(part.Modules.GetModule<WirelessReflector>().Fields.GetValue("Wavelength")));
+                                          break;
+                                       }
+                                    }
+                                 }
+                                 else
+                                 {
+                                    excess.Add(Convert.ToDouble(module.GetValue("excess")));
+                                    constant.Add(Convert.ToDouble(module.GetValue("constant")));
+                                    target.Add(module.GetValue("TransmittingTo"));
+                                    wave.Add(module.GetValue("Wavelength"));
+                                 }
+                              }
+                           }
+                        }
+                     }
+                  }
+               }
             }
         }
 
@@ -97,7 +116,12 @@ namespace BeamedPowerStandalone
                                 receiversList.Add(vesselnode);
                                 break;
                             }
-                            else if (module.GetValue("name") == "BeamedPowerReflector" | module.GetValue("name") == "ThermalEngine")
+                            else if (module.GetValue("name") == "WirelessReflector" | module.GetValue("name") == "ThermalEngine")
+                            {
+                                receiversList.Add(vesselnode);
+                                break;
+                            }
+                            else if (module.GetValue("name") == "AblativeEngine" | module.GetValue("name") == "PhotonSail")
                             {
                                 receiversList.Add(vesselnode);
                                 break;
@@ -132,20 +156,10 @@ namespace BeamedPowerStandalone
                     }
                 }
             }
-            else if (part.Modules.Contains<ModuleDeployablePart>())
-            {
-                if (part.Modules.GetModule<ModuleDeployablePart>().deployState != ModuleDeployablePart.DeployState.EXTENDED)
-                {
-                    if (part.Modules.Contains<PhotonSail>())
-                    {
-                        part.Modules.GetModule<PhotonSail>().Fields.SetValue("received_power", 0f);
-                    }
-                }
-            }
         }
     }
 
-    public class OcclusionData
+    public class PlanetOcclusion
     {
         // checks for occlusion by each celestial body
         public void IsOccluded(Vector3d source, Vector3d dest, string wavelength, out CelestialBody celestialBody, out bool occluded)
@@ -175,31 +189,17 @@ namespace BeamedPowerStandalone
         }
     }
 
-    // a class used for some of the propulsion modules
-    public class RelativeOrientation
-    {
-        public double FractionalFlux(Vector3d source_pos, Vector3d dest_pos, Vessel receiver, Part recvPart)
-        {
-            Vector3 resultant = source_pos - dest_pos;
-            Vector3 upvector = receiver.upAxis;
-            Quaternion vesselRot = Quaternion.FromToRotation(resultant, upvector);
-            Quaternion partRotation = recvPart.attRotation;
-            Quaternion resRotation = vesselRot * partRotation;
-            resRotation.ToAngleAxis(out float Angle, out _);
-            double flux = (Angle < 90 & Angle > -90) ? Math.Cos(Angle) : 0;
-            return flux;
-        }
-    }
-
     public class RelativisticEffects
     {
-        public double ScalePowerRecv(double prevDist, double Dist, string state, out string status)
+        bool relativistic; const float c = 299792452;
+        public double RedOrBlueShift(Vessel source, Vessel dest, string state, out string status)
         {
-            bool relativistic = HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().relativistic; double powerMult;
+            relativistic = HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().relativistic; double powerMult;
+            double v = Vector3d.Magnitude(source.velocityD - dest.velocityD);
+            v *= Math.Cos(Vector3d.Angle((source.GetWorldPos3D() - dest.GetWorldPos3D()), (source.velocityD - dest.velocityD)));
+
             if (relativistic)
             {
-                double v = (Dist - prevDist) / Time.fixedDeltaTime;  const float c = 299792452;   // v is radial velocity only
-                
                 if (v >= c - 1)
                 {
                     powerMult = 0;
@@ -218,43 +218,15 @@ namespace BeamedPowerStandalone
             }
             return powerMult;
         }
-    }
 
-    public class ReceiverPowerCalc : PartModule
-    {
-        // adds received power calculator to receivers right-click menu in editor
+        //public bool IsWarpDriveEngaged(Part part, double prevDist, double Dist, string state, out string status)
+        //{
+        //    bool engaged = false; relativistic = HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().relativistic;
 
-        [KSPField(guiName = "Distance", groupName = "calculator1", groupDisplayName = "Received Power Calculator", groupStartCollapsed = true, guiUnits = "Mm", guiActive = false, guiActiveEditor = true, isPersistant = false), UI_FloatRange(minValue = 0, maxValue = 10000000, stepIncrement = 0.001f, scene = UI_Scene.Editor)]
-        public float dist_ui;
-
-        [KSPField(guiName = "Source Dish Diameter", groupName = "calculator1", guiUnits = "m", guiActive = false, guiActiveEditor = true, isPersistant = false), UI_FloatRange(minValue = 0, maxValue = 100, stepIncrement = 0.5f, scene = UI_Scene.Editor)]
-        public float dish_dia_ui;
-
-        [KSPField(guiName = "Source Efficiency", groupName = "calculator1", guiActive = false, guiActiveEditor = true, guiUnits = "%", isPersistant = false), UI_FloatRange(minValue = 0, maxValue = 100, stepIncrement = 1, scene = UI_Scene.Editor)]
-        public float efficiency;
-
-        [KSPField(guiName = "Power Beamed", groupName = "calculator1", guiUnits = "EC/s", guiActive = false, guiActiveEditor = true, isPersistant = false), UI_FloatRange(minValue = 0, maxValue = 100000, stepIncrement = 1, scene = UI_Scene.Editor)]
-        public float beamedPower;
-
-        [KSPField(guiName = "Result", groupName = "calculator1", guiUnits = "EC/s", guiActive = false, guiActiveEditor = true, isPersistant = false)]
-        public float powerReceived;
-
-        [KSPField(guiName = "Beamed Wavelength", groupName = "calculator1", guiActiveEditor = true, guiActive = false, isPersistant = false)]
-        public string wavelength_ui;
-
-        [KSPEvent(guiName = "Toggle Wavelength", guiActive = false, guiActiveEditor = true, groupName = "calculator1", isPersistent = false)]
-        public void ToggleWavelength()
-        {
-            wavelength_ui = (wavelength_ui == "Long") ? "Short" : "Long";
-        }
-
-        public void CalculatePower(float recvDia, float recvefficiency)
-        {
-            float wavelength_num = (float)((wavelength_ui == "Long") ? Math.Pow(10, -3) : 5 * Math.Pow(10, -8));
-            float spot_size = (float)(1.44 * wavelength_num * dist_ui * 1000000 / dish_dia_ui);
-            powerReceived = (spot_size > recvDia) ?
-                recvDia / spot_size * beamedPower * (efficiency / 100) * recvefficiency : beamedPower * (efficiency / 100) * recvefficiency;
-            powerReceived = (float)Math.Round(powerReceived, 1);
-        }
+        //    if (part.Modules.Contains)
+        //    {
+        //        engaged = true;
+        //    }
+        //}
     }
 }

@@ -136,80 +136,83 @@ namespace BeamedPowerStandalone
             double heatModifier = (double)HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().PercentHeat / 100;
             double heatExcess = (1 - Efficiency) * (excess / Efficiency) * heatModifier;
             wasteHeat = (float)Math.Round(heatExcess, 1);
-            coreHeat.AddEnergyToCore(heatExcess * 0.7 * 3 * Time.fixedDeltaTime);  // first converted to kJ
+            coreHeat.AddEnergyToCore(heatExcess * 0.7 * Time.fixedDeltaTime);  // first converted to kJ
             part.AddSkinThermalFlux(heatExcess * 0.3);      // some heat added to skin
         }
 
         // main block of code - runs every physics frame
         public void FixedUpdate()
         {
-            if (initFrames < 60)
+            if (HighLogic.LoadedSceneIsFlight)
             {
-                initFrames += 1;
-            }
-            else
-            {
-                AddHeatToCore();
-            }
-            
-            if (Transmitting == true)
-            {
-                frames += 1;
-                if (frames == 150)
+                if (initFrames < 60)
                 {
-                    try
-                    {
-                        vesselFinder.ReceiverData(out receiversList);
-                    }
-                    catch
-                    {
-                        Debug.Log("BeamedPowerStandalone.WirelessSource : Unable to load receiver vessel list.");
-                    }
-                    frames = 0;
-                }
-                
-                counter = (counter < receiversList.Count) ? counter : counter = 0;
-                try
-                {
-                    TransmittingTo = receiversList[Convert.ToInt32(counter)].GetValue("name");
-                }
-                catch
-                {
-                    TransmittingTo = "None";
-                }
-                
-                this.vessel.GetConnectedResourceTotals(EChash, out double amount, out _);
-                if (amount < 1)
-                {
-                    powerBeamed = 0;
-                }
-                // a bunch of math
-                excess = Convert.ToSingle(Math.Round((powerBeamed * Efficiency), 1));
-                if (Wavelength == "Short")      // short ultraviolet
-                {
-                    constant = Convert.ToSingle((1.44 * 5 * Math.Pow(10, -8)) / DishDiameter);
-                }
-                else if (Wavelength == "Long")  // short microwave
-                {
-                    constant = Convert.ToSingle((1.44 * Math.Pow(10, -3)) / DishDiameter);
+                    initFrames += 1;
                 }
                 else
                 {
-                    Debug.LogError("BeamedPowerStandalone.WirelessSource : Incorrect paramater for wavelength in part.cfg");
-                    constant = 0;
+                    AddHeatToCore();
                 }
-                animation.SyncAnimationState(this.part);
 
-                if (HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().BackgroundProcessing == false)
+                this.vessel.GetConnectedResourceTotals(EChash, out double amount, out double maxAmount);
+                if (amount/maxAmount < 0.2d)
                 {
-                    // reducing amount of EC in craft in each frame (makes it look like continuous EC consumption)
-                    double resource_drain = powerBeamed * Time.fixedDeltaTime;
-                    this.part.RequestResource(EChash, resource_drain);
+                    powerBeamed = 0f;
                 }
-            }
-            if (Transmitting==false)
-            {
-                excess = 0;
+
+                if (Transmitting == true)
+                {
+                    frames += 1;
+                    if (frames == 150)
+                    {
+                        try
+                        {
+                            vesselFinder.ReceiverData(out receiversList);
+                        }
+                        catch
+                        {
+                            Debug.Log("BeamedPowerStandalone.WirelessSource : Unable to load receiver vessel list.");
+                        }
+                        frames = 0;
+                    }
+
+                    counter = (counter < receiversList.Count) ? counter : counter = 0;
+                    try
+                    {
+                        TransmittingTo = receiversList[Convert.ToInt32(counter)].GetValue("name");
+                    }
+                    catch
+                    {
+                        TransmittingTo = "None";
+                    }
+
+                    // a bunch of math
+                    excess = Convert.ToSingle(Math.Round((powerBeamed * Efficiency), 1));
+                    if (Wavelength == "Short")      // short ultraviolet
+                    {
+                        constant = Convert.ToSingle((1.44 * 5 * Math.Pow(10, -8)) / DishDiameter);
+                    }
+                    else if (Wavelength == "Long")  // short microwave
+                    {
+                        constant = Convert.ToSingle((1.44 * Math.Pow(10, -3)) / DishDiameter);
+                    }
+                    else
+                    {
+                        Debug.LogError("BeamedPowerStandalone.WirelessSource : Incorrect paramater for wavelength in part.cfg");
+                        constant = 0;
+                    }
+                    animation.SyncAnimationState(this.part);
+
+                    if (HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().BackgroundProcessing == false)
+                    {
+                        // reducing amount of EC in craft in each frame (makes it look like continuous EC consumption)
+                        this.part.RequestResource(EChash, (double)(powerBeamed * Time.fixedDeltaTime));
+                    }
+                }
+                if (Transmitting == false)
+                {
+                    excess = 0; 
+                }
             }
         }
 
