@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
+using KSP.Localization;
 using CommNet.Occluders;
 
 namespace BeamedPowerStandalone
@@ -111,7 +112,7 @@ namespace BeamedPowerStandalone
                     {
                         foreach (ConfigNode module in partnode.GetNodes("MODULE"))
                         {
-                            if (module.GetValue("name") == "WirelessReceiver" | module.GetValue("name") == "WirelessReceiverDirectional")
+                            if (module.GetValue("name") == "WirelessReceiver")
                             {
                                 receiversList.Add(vesselnode);
                                 break;
@@ -133,32 +134,6 @@ namespace BeamedPowerStandalone
         }
     }
 
-    // syncs animation state (eg retracted/extended) with power received/transmitted
-    public class AnimationSync
-    {
-        public void SyncAnimationState(Part part)
-        {
-            if (part.Modules.Contains<ModuleDeployableAntenna>())
-            {
-                if (part.Modules.GetModule<ModuleDeployableAntenna>().deployState != ModuleDeployableAntenna.DeployState.EXTENDED)
-                {
-                    if (part.Modules.Contains<WirelessSource>())
-                    {
-                        part.Modules.GetModule<WirelessSource>().Fields.SetValue("Transmitting", false);
-                    }
-                    else if (part.Modules.Contains<WirelessReceiver>())
-                    {
-                        part.Modules.GetModule<WirelessReceiver>().Fields.SetValue("Listening", false);
-                    }
-                    else if (part.Modules.Contains<WirelessReceiverDirectional>())
-                    {
-                        part.Modules.GetModule<WirelessReceiverDirectional>().Fields.SetValue("Listening", false);
-                    }
-                }
-            }
-        }
-    }
-
     public class PlanetOcclusion
     {
         // checks for occlusion by each celestial body
@@ -172,7 +147,7 @@ namespace BeamedPowerStandalone
                 transform2 = FlightGlobals.Bodies[x].transform;
                 radius2 = FlightGlobals.Bodies[x].Radius;
                 celestialBody = FlightGlobals.Bodies[x];
-                radius2 *= (wavelength == "Long") ? 0.7 : 0.9;
+                radius2 *= (wavelength == "Long") ? 0.7 : 0.95;
 
                 OccluderHorizonCulling occlusion = new OccluderHorizonCulling(transform2, radius2, radius2, radius2);
                 occlusion.Update();
@@ -191,19 +166,22 @@ namespace BeamedPowerStandalone
 
     public class RelativisticEffects
     {
-        bool relativistic; const float c = 299792452;
+        bool relativistic; const float c = 299792452; Vector3d prevPos = Vector3d.zero;
+        string exceeded_c = Localizer.Format("#LOC_BeamedPower_ExceededC");
+
         public double RedOrBlueShift(Vessel source, Vessel dest, string state, out string status)
         {
             relativistic = HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().relativistic; double powerMult;
-            double v = Vector3d.Magnitude(source.velocityD - dest.velocityD);
-            v *= Math.Cos(Vector3d.Angle((source.GetWorldPos3D() - dest.GetWorldPos3D()), (source.velocityD - dest.velocityD)));
+            double v = Vector3d.Magnitude(source.orbit.GetWorldSpaceVel() - dest.orbit.GetWorldSpaceVel());
+            v *= Math.Cos(Vector3d.Angle((source.GetWorldPos3D() - dest.GetWorldPos3D()), 
+                (source.orbit.GetWorldSpaceVel() - dest.orbit.GetWorldSpaceVel())));
 
             if (relativistic)
             {
                 if (v >= c - 1)
                 {
                     powerMult = 0;
-                    status = "Exceeded Light Speed";
+                    status = exceeded_c;
                 }
                 else
                 {
@@ -219,14 +197,21 @@ namespace BeamedPowerStandalone
             return powerMult;
         }
 
-        //public bool IsWarpDriveEngaged(Part part, double prevDist, double Dist, string state, out string status)
-        //{
-        //    bool engaged = false; relativistic = HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().relativistic;
-
-        //    if (part.Modules.Contains)
-        //    {
-        //        engaged = true;
-        //    }
-        //}
+        public bool WarpDriveEngaged(Part part)
+        {
+            relativistic = HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().relativistic; bool warping = false;
+            if (relativistic)
+            {
+                Vector3d position =  part.vessel.GetWorldPos3D();
+                double displacement = Vector3d.Distance(position, prevPos);
+                double v = displacement / TimeWarp.fixedDeltaTime;
+                if (v > part.vessel.orbit.GetWorldSpaceVel().magnitude * 2d)
+                {
+                    warping = true;
+                }
+                prevPos = position;
+            }
+            return warping;
+        }
     }
 }

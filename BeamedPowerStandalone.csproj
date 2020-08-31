@@ -55,7 +55,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="BeamedPowerReceivers.cs" />
+    <Compile Include="BeamedPowerReceiver.cs" />
     <Compile Include="BeamedPowerSource.cs" />
     <Compile Include="ReceivedPower.cs" />
     <Compile Include="Settings.cs" />

@@ -55,7 +55,7 @@ namespace BeamedPowerStandalone
 
                 case GameParameters.Preset.Custom:
                     PercentHeat = 50;
-                    photonthrust = 100;
+                    photonthrust = 300;
                     break;
             }
         }

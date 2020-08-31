@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
+using KSP.Localization;
 using BeamedPowerStandalone;
 
 namespace BeamedPowerPropulsion
@@ -8,22 +9,25 @@ namespace BeamedPowerPropulsion
     public class AblativeEngine : PartModule
     {
         [KSPField(guiName = "Received Power", isPersistant = true, guiActive = true, guiActiveEditor = false, guiUnits = "kW")]
-        public float receivedPower;
+        public float ReceivedPower;
 
         [KSPField(guiName = "Received Power Limiter", isPersistant = true, guiActive = true, guiActiveEditor = false, guiUnits = "%"), UI_FloatRange(minValue = 0, maxValue = 100, stepIncrement = 1, requireFullControl = true, scene = UI_Scene.Flight)]
-        public float percentagePower;
+        public float PowerLimiter;
 
         [KSPField(guiName = "Receiving from", isPersistant = false, guiActive = true, guiActiveEditor = false)]
-        public string CorrectVesselName;
+        public string ReceivingFrom;
 
         [KSPField(guiName = "Power Status", guiActive = true, guiActiveEditor = false, isPersistant = false)]
-        public string state;
+        public string State;
+
+        [KSPField(guiName = "Skin Temperature", guiActive = true, guiActiveEditor = false, isPersistant = false, groupName = "HeatInfo", groupDisplayName = "Heat Info", groupStartCollapsed = false)]
+        public float SkinTemp;
 
         [KSPField(guiName = "Propellant", isPersistant = false, guiActive = true, guiActiveEditor = false)]
-        public string propellantNameUI;
+        public string PropellantName;
 
         [KSPField(guiName = "Propellant Loss", isPersistant = false, guiActive = true, guiActiveEditor = false, guiUnits = "U/s")]
-        public float loss;
+        public float Loss;
 
         // parameters set in part.cfg file
         [KSPField(isPersistant = false)]
@@ -45,10 +49,13 @@ namespace BeamedPowerPropulsion
             counter += 1;
         }
 
-        ModuleEnginesFX engine; ReceivedPower receiver;
+        ModuleEnginesFX engine; ReceivedPower receiver; float percentThrust;
+        string operational = Localizer.Format("#LOC_BeamedPower_status_Operational");
+        string engineOff = Localizer.Format("#LOC_BeamedPower_ThermalEngine_EngineOff");
 
         public void Start()
         {
+            Fields["SkinTemp"].guiUnits = "K/" + this.part.maxTemp.ToString() + "K";
             try
             {
                 engine = this.part.Modules.GetModule<ModuleEnginesFX>();
@@ -61,6 +68,46 @@ namespace BeamedPowerPropulsion
             engine.throttleResponseRate /= 5;
             engine.engineSpoolTime = 5;
             receiver = new ReceivedPower();
+            try
+            {
+                // editing engine's thrust limiter field's gui
+                engine.Fields["thrustPercentage"].guiName = Localizer.Format("#LOC_BeamedPower_PercentMaxThrust");
+                engine.Fields["thrustPercentage"].guiUnits = "%";
+                ((UI_FloatRange)engine.Fields["thrustPercentage"].uiControlFlight).scene = UI_Scene.Flight;
+                engine.Fields["thrustPercentage"].guiActiveEditor = false;
+
+            }
+            catch
+            {
+                Debug.LogWarning("BeamedPowerPropulsion.AblativeEngine : Unable to edit engine module Field");
+            }
+
+            SetLocalization();
+        }
+
+        private void SetLocalization()
+        {
+            //flight
+            Fields["ReceivedPower"].guiName = Localizer.Format("#LOC_BeamedPower_RecvPower");
+            Fields["PowerLimiter"].guiName = Localizer.Format("#LOC_BeamedPower_RecvPowerLimiter");
+            Fields["ReceivingFrom"].guiName = Localizer.Format("#LOC_BeamedPower_RecvFrom");
+            Fields["State"].guiName = Localizer.Format("#LOC_BeamedPower_AblativeEngine_PowerStatus");
+            Fields["SkinTemp"].guiName = Localizer.Format("#LOC_BeamedPower_SkinTemp");
+            Fields["SkinTemp"].group.displayName = Localizer.Format("#LOC_BeamedPower_HeatInfo");
+            Fields["PropellantName"].guiName = Localizer.Format("#LOC_BeamedPower_Propellant");
+            Fields["Loss"].guiName = Localizer.Format("#LOC_BeamedPower_AblativeEngine_PropellantLoss");
+            Events["VesselCounter"].guiName = Localizer.Format("#LOC_BeamedPower_Vessels_Cyclethrough");
+            //editor
+            Fields["Distance"].guiName = Localizer.Format("#LOC_BeamedPower_CalcDistance");
+            Fields["Distance"].group.displayName = Localizer.Format("#LOC_BeamedPower_ThrustCalcName");
+            Fields["SourceDishDia"].guiName = Localizer.Format("#LOC_BeamedPower_CalcSourceDishDia");
+            Fields["CalcEfficiency"].guiName = Localizer.Format("#LOC_BeamedPower_CalcSourceEfficiency");
+            Fields["BeamedPower"].guiName = Localizer.Format("#LOC_BeamedPower_CalcPowerBeamed");
+            Fields["Isp"].guiName = Localizer.Format("#LOC_BeamedPower_CalcEngineIsp");
+            Fields["Angle"].guiName = Localizer.Format("#LOC_BeamedPower_AblativeEngine_CalcAngle");
+            Fields["Thrust"].guiName = Localizer.Format("#LOC_BeamedPower_CalcThrust");
+            Fields["CalcWavelength"].guiName = Localizer.Format("#LOC_BeamedPower_CalcWavelength");
+            Events["ToggleWavelength"].guiName = Localizer.Format("#LOC_BeamedPower_CalcToggleWavelength");
         }
 
         public string GetModuleTitle()
@@ -69,12 +116,13 @@ namespace BeamedPowerPropulsion
         }
         public override string GetModuleDisplayName()
         {
-            return "Ablative Engine";
+            return Localizer.Format("#LOC_BeamedPower_AblativeEngine_ModuleName");
         }
         public override string GetInfo()
         {
-            return ("Engine Exposed Area: " + Convert.ToString(SurfaceArea) + "m²" + "\n"
-                + "Engine Efficiency: " + Convert.ToString(Efficiency * 100) + "%" + "\n");
+            return Localizer.Format("#LOC_BeamedPower_AblativeEngine_ModuleInfo",
+                SurfaceArea.ToString(),
+                (Efficiency * 100).ToString());
         }
 
         // main block of code runs every physics frame only in flight scene
@@ -82,25 +130,25 @@ namespace BeamedPowerPropulsion
         {
             if (HighLogic.LoadedSceneIsFlight)
             {
-                state = "Operational";
+                State = operational;
                 
                 // received power code
-                receiver.Directional(this.part, counter, true, percentagePower, SurfaceArea, Efficiency, true, true,
-                    state, out state, out CorrectVesselName, out double received_power, out counter);
+                receiver.Directional(this.part, counter, true, PowerLimiter, SurfaceArea, Efficiency, true, true,
+                    State, out State, out ReceivingFrom, out double received_power, out counter);
 
                 this.part.GetConnectedResourceTotals(engine.propellants[0].id, out double amount, out _);
                 if (amount <= 0.5d)
                 {
                     received_power = 0f;
-                    state = "Engine has been turned off";
+                    State = engineOff;
                 }
-                receivedPower = (float)Math.Round(received_power, 1);
+                ReceivedPower = (float)Math.Round(received_power, 1);
 
                 // code related to engine module
                 float currentisp = engine.realIsp;
 
                 // getting propellant resource definition
-                propellantNameUI = engine.propellants[0].displayName; string propellantname = engine.propellants[0].name;
+                PropellantName = engine.propellants[0].displayName; string propellantname = engine.propellants[0].name;
                 float shc = PartResourceLibrary.Instance.GetDefinition(propellantname).specificHeatCapacity * 1.5f / 1000f;    // in kJ kg^-1 K^-1
                 float density = PartResourceLibrary.Instance.GetDefinition(propellantname).density * 1000;  // in kg/l
 
@@ -109,50 +157,51 @@ namespace BeamedPowerPropulsion
                 Thrust = (Thrust < 15f) ? 0f : Thrust; // minimum thrust (min received power) below this there isnt enough heat to exceed metal's boiling point
 
                 // propellant loss
-                loss = (float)((received_power / Efficiency) * (1 - Efficiency) * 0.2f / (shc * 2600f * density));  // units/s (l/s)
-                loss = (engine.GetCurrentThrust() > 1f) ? loss : 0f;
-                this.part.RequestResource(propellantname, (double)loss * Time.fixedDeltaTime);
+                Loss = (float)((received_power / Efficiency) * (1 - Efficiency) * 0.2f / (shc * 2600f * density));  // units/s (l/s)
+                Loss = (engine.GetCurrentThrust() > 1f) ? Loss : 0f;
+                this.part.RequestResource(propellantname, (double)Loss * Time.fixedDeltaTime);
 
                 // adding heat to part's skin
                 double heatModifier = HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().PercentHeat;    // in kW
-                this.part.AddSkinThermalFlux(received_power * (1 - Efficiency) * 0.8 * (heatModifier / 100));
+                this.part.AddThermalFlux(received_power * (1 - Efficiency) * 0.8 * (heatModifier / 100));
 
                 // adjust thrust limiter, based on what max thrust should be as calculated
-                float percentThrust = Thrust * thrustMult / engine.maxThrust;
+                percentThrust = Thrust * thrustMult / engine.maxThrust;
                 engine.thrustPercentage = Mathf.Clamp((float)Math.Round(percentThrust * 100, 2), 0f, 100f);
             }
         }
 
         // thrust calculator
         [KSPField(guiName = "Distance", groupName = "calculator4", groupDisplayName = "Thrust Calculator", groupStartCollapsed = true, guiUnits = "Mm", guiActive = false, guiActiveEditor = true), UI_FloatRange(minValue = 0, maxValue = 10000000, stepIncrement = 0.001f, scene = UI_Scene.Editor)]
-        public float dist_ui;
+        public float Distance;
 
         [KSPField(guiName = "Source Dish Diameter", groupName = "calculator4", guiUnits = "m", guiActive = false, guiActiveEditor = true), UI_FloatRange(minValue = 0, maxValue = 100, stepIncrement = 0.5f, scene = UI_Scene.Editor)]
-        public float dish_dia_ui;
+        public float SourceDishDia;
 
         [KSPField(guiName = "Source Efficiency", groupName = "calculator4", guiActive = false, guiActiveEditor = true, guiUnits = "%"), UI_FloatRange(minValue = 0, maxValue = 100, stepIncrement = 1, scene = UI_Scene.Editor)]
-        public float efficiency;
+        public float CalcEfficiency;
 
         [KSPField(guiName = "Power Beamed", groupName = "calculator4", guiUnits = "EC/s", guiActive = false, guiActiveEditor = true), UI_FloatRange(minValue = 0, maxValue = 100000, stepIncrement = 1, scene = UI_Scene.Editor)]
-        public float beamedPower;
+        public float BeamedPower;
 
         [KSPField(guiName = "Engine Isp", groupName = "calculator4", guiUnits = "s", guiActive = false, guiActiveEditor = true), UI_FloatRange(minValue = 0, maxValue = 5000, stepIncrement = 5, scene = UI_Scene.Editor)]
         public float Isp;
 
         [KSPField(guiName = "Angle to source", groupName = "calculator4", guiUnits = "°", guiActive = false, guiActiveEditor = true), UI_FloatRange(minValue = 0, maxValue = 90, stepIncrement = 1, scene = UI_Scene.Editor)]
-        public float angle;
+        public float Angle;
 
         [KSPField(guiName = "Thrust", groupName = "calculator4", guiUnits = "kN", guiActive = false, guiActiveEditor = true)]
         public float Thrust;
 
         [KSPField(guiName = "Beamed Wavelength", groupName = "calculator4", guiActiveEditor = true, guiActive = false)]
-        public string wavelength_ui = "Long";
+        public string CalcWavelength = Localizer.Format("#LOC_BeamedPower_Wavelength_long");
 
         [KSPEvent(guiName = "Toggle Wavelength", guiActive = false, guiActiveEditor = true, groupName = "calculator4")]
         public void ToggleWavelength()
         {
-            wavelength_ui = (wavelength_ui == "Long") ? "Short" : "Long";
+            CalcWavelength = (CalcWavelength == Long) ? Short : Long;
         }
+        string Long = Localizer.Format("#LOC_BeamedPower_Wavelength_long"); string Short = Localizer.Format("#LOC_BeamedPower_Wavelength_short");
 
         // only runs in editor (code for thrust calculator)
         public void Update()
@@ -160,17 +209,21 @@ namespace BeamedPowerPropulsion
             if (HighLogic.LoadedSceneIsEditor)
             {
                 engine.thrustPercentage = 100f;
-                float wavelength_num = (float)((wavelength_ui == "Long") ? Math.Pow(10, -3) : 5 * Math.Pow(10, -8));
-                float spotArea = (float)Math.Pow((1.44 * wavelength_num * dist_ui * 1000000 / dish_dia_ui)/2, 2) * 3.14f;
+                float wavelength_num = (float)((CalcWavelength == Long) ? Math.Pow(10, -3) : 5 * Math.Pow(10, -8));
+                float spotArea = (float)Math.Pow((1.44 * wavelength_num * Distance * 1000000 / SourceDishDia)/2, 2) * 3.14f;
                 double powerReceived = (spotArea > SurfaceArea) ?
-                    (SurfaceArea / spotArea) * beamedPower * (efficiency / 100) * Efficiency : beamedPower * (efficiency / 100) * Efficiency;
-                powerReceived *= Math.Cos(angle * Math.PI / 180);
+                    (SurfaceArea / spotArea) * BeamedPower * (CalcEfficiency / 100) * Efficiency : BeamedPower * (CalcEfficiency / 100) * Efficiency;
+                powerReceived *= Math.Cos(Angle * Math.PI / 180);
 
                 string propellantname = engine.propellants[0].name;
                 float shc = PartResourceLibrary.Instance.GetDefinition(propellantname).specificHeatCapacity * 1.5f / 1000f;    // in kJ kg^-1 K^-1
                 Thrust = Mathf.Clamp((float)Math.Round((powerReceived * 0.2f / (shc * 8600f)) * 9.8d * Isp, 1), 
                     0f, engine.GetMaxThrust());
                 Thrust = (Thrust < 15f) ? 0f : Thrust;
+            }
+            else if (HighLogic.LoadedSceneIsFlight)
+            {
+                engine.thrustPercentage = Mathf.Clamp((float)Math.Round(percentThrust * 100, 2), 0f, 100f);
             }
         }
     }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
+using KSP.Localization;
 
 namespace BeamedPowerStandalone
 {
@@ -14,9 +15,15 @@ namespace BeamedPowerStandalone
         List<double> excessList = new List<double>();
         List<double> constantList = new List<double>();
         List<string> targetList = new List<string>();
-        List<string> wavelengthList = new List<string>();
+        public List<string> wavelengthList = new List<string>();
         List<CelestialBody> planetList = new List<CelestialBody>();
         int frames = 140;
+
+        //localization
+        string occludedby = Localizer.Format("#LOC_BeamedPower_status_Occludedby") + " ";
+        string operational = Localizer.Format("#LOC_BeamedPower_status_Operational");
+        string vesselNone = Localizer.Format("#LOC_BeamedPower_Vessel_None");
+        string warpEngaged = Localizer.Format("#LOC_BeamedPower_WarpDriveEngaged");
 
         private double FractionalFlux(Vector3d source_pos, Vector3d dest_pos, Part thisPart)
         {
@@ -65,7 +72,11 @@ namespace BeamedPowerStandalone
                     if (occluded)
                     {
                         received_power = 0;
-                        state = "Occluded by " + body.GetDisplayName().TrimEnd(Convert.ToChar("N")).TrimEnd(Convert.ToChar("^"));
+                        state = occludedby + body.GetDisplayName().TrimEnd('N', '^');
+                    }
+                    else
+                    {
+                        state = operational;
                     }
 
                     received_power *= relativistic.RedOrBlueShift(VesselList[counter], thisPart.vessel, state, out state);
@@ -73,19 +84,23 @@ namespace BeamedPowerStandalone
                     {
                         received_power *= FractionalFlux(source, dest, thisPart);
                     }
+                    if (relativistic.WarpDriveEngaged(thisPart))
+                    {
+                        received_power = 0;
+                        state = warpEngaged;
+                    }
                 }
                 else
                 {
                     received_power = 0;
-                    VesselName = "None";
+                    VesselName = vesselNone;
                 }
             }
             else
             {
                 received_power = 0;
-                VesselName = "None";
+                VesselName = vesselNone;
             }
-
             status = state; counter2 = counter;
         }
 
@@ -145,54 +160,20 @@ namespace BeamedPowerStandalone
                     }
                     if (planetList.Count > 0)
                     {
-                        state = "Occluded by " + planetList[planetList.Count - 1].GetDisplayName()
-                            .TrimEnd(Convert.ToChar("N")).TrimEnd(Convert.ToChar("^"));
+                        state = occludedby + planetList[planetList.Count - 1].GetDisplayName().TrimEnd('N', '^');
                     }
                     else
                     {
-                        state = "Operational";
+                        state = operational;
+                    }
+                    if (relativistic.WarpDriveEngaged(thisPart) & state != warpEngaged)
+                    {
+                        received_power = 0d;
+                        state = warpEngaged;
                     }
                 }
             }
             status = state;
-        }
-    }
-
-    public class ReceiverPowerCalc : PartModule
-    {
-        // adds received power calculator to receivers right-click menu in editor
-
-        [KSPField(guiName = "Distance", groupName = "calculator1", groupDisplayName = "Received Power Calculator", groupStartCollapsed = true, guiUnits = "Mm", guiActive = false, guiActiveEditor = true, isPersistant = false), UI_FloatRange(minValue = 0, maxValue = 10000000, stepIncrement = 0.001f, scene = UI_Scene.Editor)]
-        public float dist_ui;
-
-        [KSPField(guiName = "Source Dish Diameter", groupName = "calculator1", guiUnits = "m", guiActive = false, guiActiveEditor = true, isPersistant = false), UI_FloatRange(minValue = 0, maxValue = 100, stepIncrement = 0.5f, scene = UI_Scene.Editor)]
-        public float dish_dia_ui;
-
-        [KSPField(guiName = "Source Efficiency", groupName = "calculator1", guiActive = false, guiActiveEditor = true, guiUnits = "%", isPersistant = false), UI_FloatRange(minValue = 0, maxValue = 100, stepIncrement = 1, scene = UI_Scene.Editor)]
-        public float efficiency;
-
-        [KSPField(guiName = "Power Beamed", groupName = "calculator1", guiUnits = "EC/s", guiActive = false, guiActiveEditor = true, isPersistant = false), UI_FloatRange(minValue = 0, maxValue = 100000, stepIncrement = 1, scene = UI_Scene.Editor)]
-        public float beamedPower;
-
-        [KSPField(guiName = "Result", groupName = "calculator1", guiUnits = "EC/s", guiActive = false, guiActiveEditor = true, isPersistant = false)]
-        public float powerReceived;
-
-        [KSPField(guiName = "Beamed Wavelength", groupName = "calculator1", guiActiveEditor = true, guiActive = false, isPersistant = false)]
-        public string wavelength_ui = "Long";
-
-        [KSPEvent(guiName = "Toggle Wavelength", guiActive = false, guiActiveEditor = true, groupName = "calculator1", isPersistent = false)]
-        public void ToggleWavelength()
-        {
-            wavelength_ui = (wavelength_ui == "Long") ? "Short" : "Long";
-        }
-
-        public void CalculatePower(float recvDia, float recvefficiency)
-        {
-            float wavelength_num = (float)((wavelength_ui == "Long") ? Math.Pow(10, -3) : 5 * Math.Pow(10, -8));
-            float spot_size = (float)(1.44 * wavelength_num * dist_ui * 1000000 / dish_dia_ui);
-            powerReceived = (spot_size > recvDia) ?
-                recvDia / spot_size * beamedPower * (efficiency / 100) * recvefficiency : beamedPower * (efficiency / 100) * recvefficiency;
-            powerReceived = (float)Math.Round(powerReceived, 1);
         }
     }
 }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
+using KSP.Localization;
 
 namespace BeamedPowerStandalone
 {
@@ -11,7 +12,7 @@ namespace BeamedPowerStandalone
         public bool Transmitting;
 
         [KSPField(guiName = "Power to Beam", isPersistant = true, guiActive = true, guiActiveEditor = false, guiUnits = "EC/s"), UI_FloatRange(minValue = 0, maxValue = 100000, stepIncrement = 1, scene = UI_Scene.Flight)]
-        public float powerBeamed;
+        public float PowerBeamed;
 
         [KSPField(guiName = "Beamed Power", isPersistant = true, guiActive = true, guiActiveEditor = false, guiUnits = "EC/s", guiActiveUnfocused = true, unfocusedRange = 10000000000000)]
         public float excess;
@@ -23,16 +24,16 @@ namespace BeamedPowerStandalone
         public string TransmittingTo;
 
         [KSPField(guiName = "Status", isPersistant = false, guiActive = true, guiActiveEditor = false)]
-        public string state;
+        public string State;
 
-        [KSPField(guiName = "Core Temperature", groupName = "HeatInfo", groupDisplayName = "Heat Info", groupStartCollapsed = false, guiActive = true, guiActiveEditor = false, isPersistant = false, guiUnits = "K/900K")]
-        public float coreTemp;
+        [KSPField(guiName = "Core Temperature", groupName = "HeatInfo", groupDisplayName = "Heat Info", groupStartCollapsed = false, guiActive = true, guiActiveEditor = false, isPersistant = false)]
+        public float CoreTemp;
 
-        [KSPField(guiName = "Skin Temperature", groupName = "HeatInfo", guiActive = true, guiActiveEditor = false, isPersistant = false, guiUnits = "K/1200K")]
-        public float skinTemp;
+        [KSPField(guiName = "Skin Temperature", groupName = "HeatInfo", guiActive = true, guiActiveEditor = false, isPersistant = false)]
+        public float SkinTemp;
 
         [KSPField(guiName = "Waste Heat", groupName = "HeatInfo", guiActive = true, guiActiveEditor = false, isPersistant = false, guiUnits = "kW")]
-        public float wasteHeat;
+        public float WasteHeat;
 
         // 'dish_diameter', 'efficiency', and 'wavelength' are set in part.cfg file:
         [KSPField(isPersistant = false)]
@@ -43,31 +44,65 @@ namespace BeamedPowerStandalone
 
         [KSPField(isPersistant = true)]
         public float Efficiency;
+         
+        [KSPField(isPersistant = false)]
+        public float maxCoreTemp = 900f;
 
-        List<ConfigNode> receiversList; int frames; ModuleCoreHeat coreHeat; int initFrames;
-        VesselFinder vesselFinder = new VesselFinder(); AnimationSync animation = new AnimationSync();
+        [KSPField(isPersistant = false)]
+        public float maxSkinTemp = 1200f;
+
+        List<ConfigNode> receiversList; int frames; int initFrames;
+        VesselFinder vesselFinder = new VesselFinder(); ModuleCoreHeat coreHeat;
+        string operational = Localizer.Format("#LOC_BeamedPower_status_Operational");
+        string ExceedTempLimit = Localizer.Format("#LOC_BeamedPower_status_ExceededTempLimit");
+        string VesselNone = Localizer.Format("#LOC_BeamedPower_Vessel_None");
 
         public void Start()
         {
-            counter = (counter == null) ? counter = 0 : counter;
             frames = 145; initFrames = 0;
             receiversList = new List<ConfigNode>();
-            animation = new AnimationSync();
+            Fields["CoreTemp"].guiUnits = "K/" + maxCoreTemp.ToString() + "K";
+            Fields["SkinTemp"].guiUnits = "K/" + maxSkinTemp.ToString() + "K";
+
             SetHeatParams();
+            SetLocalization();
+        }
+
+        private void SetLocalization()
+        {
+            //flight
+            Fields["Transmitting"].guiName = Localizer.Format("#LOC_BeamedPower_WirelessSource_PowerTransmitter");
+            Fields["PowerBeamed"].guiName = Localizer.Format("#LOC_BeamedPower_WirelessSource_PowerToBeam");
+            Fields["excess"].guiName = Localizer.Format("#LOC_BeamedPower_WirelessSource_BeamedPower");
+            Fields["TransmittingTo"].guiName = Localizer.Format("#LOC_BeamedPower_WirelessSource_TransmittingTo");
+            Fields["State"].guiName = Localizer.Format("#LOC_BeamedPower_Status");
+            Fields["CoreTemp"].guiName = Localizer.Format("#LOC_BeamedPower_CoreTemp");
+            Fields["SkinTemp"].guiName = Localizer.Format("#LOC_BeamedPower_SkinTemp");
+            Fields["WasteHeat"].guiName = Localizer.Format("#LOC_BeamedPower_WasteHeat");
+            Fields["CoreTemp"].group.displayName = Localizer.Format("#LOC_BeamedPower_HeatInfo");
+            Events["VesselCounter"].guiName = Localizer.Format("#LOC_BeamedPower_Vessels_Cyclethrough");
+            Actions["ToggleBPTransmitter"].guiName = Localizer.Format("#LOC_BeamedPower_Actions_ToggleSource");
+            Actions["ActivateBPTransmitter"].guiName = Localizer.Format("#LOC_BeamedPower_Actions_ActivateSource");
+            Actions["DeactivateBPTransmitter"].guiName = Localizer.Format("#LOC_BeamedPower_Actions_DeactivateSource");
+            //editor
+            Fields["Distance"].guiName = Localizer.Format("#LOC_BeamedPower_CalcDistance");
+            Fields["RecvDiameter"].guiName = Localizer.Format("#LOC_BeamedPower_CalcRecvDiameter");
+            Fields["RecvEfficiency"].guiName = Localizer.Format("#LOC_BeamedPower_CalcRecvEfficiency");
+            Fields["PowerBeamed"].guiName = Localizer.Format("#LOC_BeamedPower_CalcPowerBeamed");
+            Fields["PowerReceived"].guiName = Localizer.Format("#LOC_BeamedPower_CalcResult");
         }
 
         private void SetHeatParams()
         {
             this.part.AddModule("ModuleCoreHeat");
             coreHeat = this.part.Modules.GetModule<ModuleCoreHeat>();
-            coreHeat.CoreTempGoal = 1300d;  // placeholder value, there is no optimum temperature
-            coreHeat.CoolantTransferMultiplier *= 3d;
-            coreHeat.radiatorCoolingFactor *= 2d;
+            coreHeat.CoreTempGoal = maxCoreTemp * 1.4;  // placeholder value, there is no optimum temperature
+            coreHeat.CoolantTransferMultiplier *= 2d;
             coreHeat.HeatRadiantMultiplier *= 2d;
         }
 
         [KSPField(isPersistant = true)]
-        public int? counter;
+        public int counter;
 
         [KSPEvent(guiName = "Cycle through vessels", guiActive = true, isPersistent = false, requireFullControl = true)]
         public void VesselCounter()
@@ -104,40 +139,56 @@ namespace BeamedPowerStandalone
         }
         public override string GetModuleDisplayName()
         {
-            return "Beamed Power Transmitter";
+            return Localizer.Format("#LOC_BeamedPower_WirelessSource_ModuleName");
         }
         public override string GetInfo()
         {
-            return ("Dish Diameter: " + Convert.ToString(DishDiameter) + "m" + "\n" 
-                + "EM Wavelength: " + Convert.ToString(Wavelength) + "\n" 
-                + "Efficiency: " + Convert.ToString(Efficiency * 100) + "%" + "\n" + "" +"\n"
-                + "Max Core Temp: 900K" + "\n"
-                + "Max Skin Temp: 1200K" + "\n" + "" + "\n"
-                + "This transmitter will shutdown past these temperatures.");
+            string Long = Localizer.Format("#LOC_BeamedPower_Wavelength_long");
+            string Short = Localizer.Format("#LOC_BeamedPower_Wavelength_short");
+            string wavelengthLocalized = (Wavelength == "Long") ? Long : Short;
+
+            return Localizer.Format("#LOC_BeamedPower_WirelessSource_ModuleInfo",
+                DishDiameter.ToString(),
+                wavelengthLocalized,
+                (Efficiency * 100).ToString(),
+                maxCoreTemp.ToString(),
+                maxSkinTemp.ToString());
         }
 
         private void AddHeatToCore()
         {
-            coreTemp = (float)(Math.Round(coreHeat.CoreTemperature, 1));
-            skinTemp = (float)(Math.Round(this.part.skinTemperature, 1));
-            if (coreTemp > 900f | skinTemp > 1200f)
+            CoreTemp = (float)(Math.Round(coreHeat.CoreTemperature, 1));
+            SkinTemp = (float)(Math.Round(this.part.skinTemperature, 1));
+
+            if (CoreTemp > maxCoreTemp | SkinTemp > maxSkinTemp)
             {
-                state = "Exceeded Temperature Limit";
-                Transmitting = (Transmitting) ? false : false;
+                State = ExceedTempLimit;
+                Transmitting = false;
             }
-            if (state == "Exceeded Temperature Limit" & (coreTemp > 700f | skinTemp > 1000f))
+            if (State == ExceedTempLimit & (CoreTemp >= maxCoreTemp * 0.7 | SkinTemp >= maxSkinTemp * 0.7))
             {
-                Transmitting = (Transmitting) ? false : false;
+                Transmitting = false;
             }
-            if (coreTemp < 700f & skinTemp < 1000f)
+            else if (CoreTemp < maxCoreTemp * 0.7 & SkinTemp < maxSkinTemp * 0.7)
             {
-                state = "Operational";
+                State = operational;
             }
             double heatModifier = (double)HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().PercentHeat / 100;
             double heatExcess = (1 - Efficiency) * (excess / Efficiency) * heatModifier;
-            wasteHeat = (float)Math.Round(heatExcess, 1);
-            coreHeat.AddEnergyToCore(heatExcess * 0.7 * Time.fixedDeltaTime);  // first converted to kJ
+            WasteHeat = (float)Math.Round(heatExcess, 1);
+            coreHeat.AddEnergyToCore(heatExcess * 0.7 * TimeWarp.fixedDeltaTime);  // first converted to kJ
             part.AddSkinThermalFlux(heatExcess * 0.3);      // some heat added to skin
+        }
+
+        private void SyncAnimationState()
+        {
+            if (part.Modules.Contains<ModuleDeployableAntenna>())
+            {
+                if (part.Modules.GetModule<ModuleDeployableAntenna>().deployState != ModuleDeployableAntenna.DeployState.EXTENDED)
+                {
+                    Transmitting = false;
+                }
+            }
         }
 
         // main block of code - runs every physics frame
@@ -153,11 +204,12 @@ namespace BeamedPowerStandalone
                 {
                     AddHeatToCore();
                 }
+                SyncAnimationState();
 
                 this.vessel.GetConnectedResourceTotals(EChash, out double amount, out double maxAmount);
                 if (amount/maxAmount < 0.2d)
                 {
-                    powerBeamed = 0f;
+                    PowerBeamed = 0f;
                 }
 
                 if (Transmitting == true)
@@ -171,7 +223,7 @@ namespace BeamedPowerStandalone
                         }
                         catch
                         {
-                            Debug.Log("BeamedPowerStandalone.WirelessSource : Unable to load receiver vessel list.");
+                            Debug.LogError("BeamedPowerStandalone.WirelessSource : Unable to load receiver vessel list.");
                         }
                         frames = 0;
                     }
@@ -179,15 +231,15 @@ namespace BeamedPowerStandalone
                     counter = (counter < receiversList.Count) ? counter : counter = 0;
                     try
                     {
-                        TransmittingTo = receiversList[Convert.ToInt32(counter)].GetValue("name");
+                        TransmittingTo = receiversList[counter].GetValue("name");
                     }
                     catch
                     {
-                        TransmittingTo = "None";
+                        TransmittingTo = VesselNone;
                     }
 
                     // a bunch of math
-                    excess = Convert.ToSingle(Math.Round((powerBeamed * Efficiency), 1));
+                    excess = Convert.ToSingle(Math.Round((PowerBeamed * Efficiency), 1));
                     if (Wavelength == "Short")      // short ultraviolet
                     {
                         constant = Convert.ToSingle((1.44 * 5 * Math.Pow(10, -8)) / DishDiameter);
@@ -198,18 +250,17 @@ namespace BeamedPowerStandalone
                     }
                     else
                     {
-                        Debug.LogError("BeamedPowerStandalone.WirelessSource : Incorrect paramater for wavelength in part.cfg");
-                        constant = 0;
+                        Debug.LogWarning("BeamedPowerStandalone.WirelessSource : Incorrect paramater for wavelength in part.cfg");
+                        constant = 1f;
                     }
-                    animation.SyncAnimationState(this.part);
 
                     if (HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().BackgroundProcessing == false)
                     {
                         // reducing amount of EC in craft in each frame (makes it look like continuous EC consumption)
-                        this.part.RequestResource(EChash, (double)(powerBeamed * Time.fixedDeltaTime));
+                        this.part.RequestResource(EChash, (double)(PowerBeamed * Time.fixedDeltaTime));
                     }
                 }
-                if (Transmitting == false)
+                else
                 {
                     excess = 0; 
                 }
@@ -218,29 +269,29 @@ namespace BeamedPowerStandalone
 
         // adds received power calculator in transmitter part's right click menu in editor
         [KSPField(guiName = "Distance", groupName = "calculator3", groupDisplayName = "Received Power Calculator", groupStartCollapsed = true, guiUnits = "Mm", guiActive = false, guiActiveEditor = true), UI_FloatRange(minValue = 0, maxValue = 10000000, stepIncrement = 0.001f, scene = UI_Scene.Editor)]
-        public float dist_ui;
+        public float Distance;
 
         [KSPField(guiName = "Receiver Diameter", groupName = "calculator3", guiUnits = "m", guiActive = false, guiActiveEditor = true), UI_FloatRange(minValue = 0, maxValue = 50, stepIncrement = 0.5f, scene = UI_Scene.Editor)]
-        public float recv_diameter;
+        public float RecvDiameter;
 
         [KSPField(guiName = "Receiver Efficiency", groupName = "calculator3", guiActive = false, guiActiveEditor = true, guiUnits = "%"), UI_FloatRange(minValue = 0, maxValue = 100, stepIncrement = 1, scene = UI_Scene.Editor)]
-        public float recv_efficiency;
+        public float RecvEfficiency;
 
         [KSPField(guiName = "Power Beamed", groupName = "calculator3", guiUnits = "EC/s", guiActive = false, guiActiveEditor = true), UI_FloatRange(minValue = 0, maxValue = 100000, stepIncrement = 1, scene = UI_Scene.Editor)]
-        public float beamedPower;
+        public float BeamedPower;
 
         [KSPField(guiName = "Result", groupName = "calculator3", guiUnits = "EC/s", guiActive = false, guiActiveEditor = true)]
-        public float powerReceived;
+        public float PowerReceived;
 
         public void Update()
         {
             if (HighLogic.LoadedSceneIsEditor)
             {
                 float wavelength_num = (float)((Wavelength == "Long") ? Math.Pow(10, -3) : 5 * Math.Pow(10, -8));
-                float spot_size = (float)(1.44 * wavelength_num * dist_ui * 1000000 / DishDiameter);
-                powerReceived = (spot_size > recv_diameter) ?
-                    recv_diameter / spot_size * beamedPower * Efficiency * (recv_efficiency / 100) : beamedPower * Efficiency * (recv_efficiency / 100);
-                powerReceived = (float)Math.Round(powerReceived, 1);
+                float spot_size = (float)(1.44 * wavelength_num * Distance * 1000000d / DishDiameter);
+                PowerReceived = (spot_size > RecvDiameter) ?
+                    RecvDiameter / spot_size * BeamedPower * Efficiency * (RecvEfficiency / 100) : BeamedPower * Efficiency * (RecvEfficiency / 100);
+                PowerReceived = (float)Math.Round(PowerReceived, 1);
             }
         }
     }
