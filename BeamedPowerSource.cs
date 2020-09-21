@@ -59,7 +59,7 @@ namespace BeamedPowerStandalone
 
         public void Start()
         {
-            frames = 145; initFrames = 0;
+            frames = 20; initFrames = 0;
             receiversList = new List<ConfigNode>();
             Fields["CoreTemp"].guiUnits = "K/" + maxCoreTemp.ToString() + "K";
             Fields["SkinTemp"].guiUnits = "K/" + maxSkinTemp.ToString() + "K";
@@ -177,7 +177,7 @@ namespace BeamedPowerStandalone
             double heatExcess = (1 - Efficiency) * (excess / Efficiency) * heatModifier;
             WasteHeat = (float)Math.Round(heatExcess, 1);
             coreHeat.AddEnergyToCore(heatExcess * 0.7 * TimeWarp.fixedDeltaTime);  // first converted to kJ
-            part.AddSkinThermalFlux(heatExcess * 0.3);      // some heat added to skin
+            this.part.AddSkinThermalFlux(heatExcess * 0.3);      // some heat added to skin
         }
 
         private void SyncAnimationState()
@@ -212,10 +212,10 @@ namespace BeamedPowerStandalone
                     PowerBeamed = 0f;
                 }
 
-                if (Transmitting == true)
+                if (Transmitting)
                 {
                     frames += 1;
-                    if (frames == 150)
+                    if (frames == 30)
                     {
                         try
                         {

@@ -34,7 +34,8 @@ namespace BeamedPowerPropulsion
         [KSPField(isPersistant = false)]
         public float partThrustMult = 1f;
 
-        ModuleEngines engines; ReceivedPower receiver;
+        readonly int EChash = PartResourceLibrary.Instance.GetDefinition("ElectricCharge").id;
+        ModuleEngines engine; ReceivedPower receiver;
         const float c = 299792452;
 
         // a lot of the usual part.cfg parameters for engines are now set within the code itself
@@ -45,26 +46,27 @@ namespace BeamedPowerPropulsion
 
             try
             {
-                engines = this.part.Modules.GetModule<ModuleEnginesFX>();
+                engine = this.part.Modules.GetModule<ModuleEngines>();
             }
             catch
             {
-                Debug.LogError(("BeamedPowerPropulsion.PhotonSail : ModuleEnginesFX not found on part-" + this.part.partName));
+                Debug.LogError(("BeamedPowerPropulsion.PhotonSail : ModuleEngines not found on part-" + this.part.partName));
             }
 
             try
             {
                 // hiding redundant moduleengines ui parameters
-                ((UI_FloatRange)engines.Fields["thrustPercentage"].uiControlFlight).scene = UI_Scene.None;
-                engines.Fields["thrustPercentage"].guiActive = false;
-                engines.Fields["thrustPercentage"].guiActiveEditor = false;
-                engines.Fields["finalThrust"].guiActive = false;
-                engines.Fields["fuelFlowGui"].guiActive = false;
-                engines.Fields["status"].guiActive = false;
+                ((UI_FloatRange)engine.Fields["thrustPercentage"].uiControlFlight).scene = UI_Scene.None;
+                ((UI_FloatRange)engine.Fields["thrustPercentage"].uiControlFlight).stepIncrement = 0.001f;
+                engine.Fields["thrustPercentage"].guiActive = false;
+                engine.Fields["thrustPercentage"].guiActiveEditor = false;
+                engine.Fields["finalThrust"].guiActive = false;
+                engine.Fields["fuelFlowGui"].guiActive = false;
+                engine.Fields["status"].guiActive = false;
             }
             catch
             {
-                Debug.LogWarning("BeamedPowerPropulsion.PhotonSail : Unable to edit engine module Field");
+                Debug.LogWarning("BeamedPowerPropulsion.PhotonSail : Unable to edit engine module Fields");
             }
 
             SetLocalization();
@@ -85,6 +87,7 @@ namespace BeamedPowerPropulsion
             Fields["SourceDishDia"].guiName = Localizer.Format("#LOC_BeamedPower_CalcSourceDishDia");
             Fields["CalcEfficiency"].guiName = Localizer.Format("#LOC_BeamedPower_CalcSourceEfficiency");
             Fields["BeamedPower"].guiName = Localizer.Format("#LOC_BeamedPower_CalcPowerBeamed");
+            Fields["Angle"].guiName = Localizer.Format("#LOC_BeamedPower_AblativeEngine_CalcAngle");
             Fields["Thrust"].guiName = Localizer.Format("#LOC_BeamedPower_CalcThrust");
             Fields["CalcWavelength"].guiName = Localizer.Format("#LOC_BeamedPower_CalcWavelength");
             Events["ToggleWavelength"].guiName = Localizer.Format("#LOC_BeamedPower_CalcToggleWavelength");
@@ -94,13 +97,9 @@ namespace BeamedPowerPropulsion
         {
             if (this.part.Modules.Contains<ModuleDeployablePart>())
             {
-                if (this.part.Modules.GetModule<ModuleDeployablePart>().deployState == ModuleDeployablePart.DeployState.EXTENDED)
+                if (this.part.Modules.GetModule<ModuleDeployablePart>().deployState != ModuleDeployablePart.DeployState.EXTENDED)
                 {
-                    engines.Activate();
-                }
-                else
-                {
-                    engines.Shutdown();
+                    ReceivedPower = 0f;
                 }
             }
         }
@@ -125,12 +124,11 @@ namespace BeamedPowerPropulsion
         {
             if (HighLogic.LoadedSceneIsFlight)
             {
-                AnimationState();
-
                 receiver.Spherical(this.part, true, PowerLimiter, SurfaceArea, 1d, true, true, State, out State, out double recvPower);
                 ReceivedPower = (float)Math.Round(recvPower, 1);
+                AnimationState();
 
-                double impulse = ReceivedPower * 1000 * partThrustMult / c;
+                double impulse = ReceivedPower * 1000f * partThrustMult / c;
 
                 // adding heat to part's skin
                 double heatModifier = HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().PercentHeat;
@@ -139,18 +137,26 @@ namespace BeamedPowerPropulsion
 
                 // code related to the engine module
                 double thrustMult = HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().photonthrust;
-                float Thrust = (float)(impulse * Reflectivity * (engines.realIsp / 30592000) * thrustMult); // in N
-                ThrustN = (float)Math.Round(engines.GetCurrentThrust() * 1000, 2);
-                float percentThrust = Thrust / (engines.maxThrust * 1000);
-                engines.thrustPercentage = Mathf.Clamp((float)Math.Round(percentThrust * 100, 2), 0f, 100f);
+                float Thrust = (float)(impulse * Reflectivity * (engine.realIsp / 30592000) * thrustMult); // in N
+                ThrustN = (float)Math.Round(engine.GetCurrentThrust() * 1000, 3);
+                float percentThrust = Thrust / (engine.maxThrust * 1000);
+                engine.thrustPercentage = Mathf.Clamp((float)Math.Round(percentThrust * 100, 3), 0f, 100f);
+
+                this.vessel.GetConnectedResourceTotals(EChash, out double ECamount, out double maxAmount);
+                if (ECamount / maxAmount < 0.01f)
+                {
+                    engine.thrustPercentage = 0f;
+                }
 
                 // replenishes photons resource
-                int fuelId = engines.propellants[0].resourceDef.id;
-                this.part.GetConnectedResourceTotals(fuelId, out double amount, out _);
-                if (amount < 10d)
+                int fuelId = engine.propellants[0].resourceDef.id;
+                this.part.GetConnectedResourceTotals(fuelId, out double Fuelamount, out _);
+                if (Fuelamount < 10d)
                 {
                     this.part.RequestResource(fuelId, -100d); // increases quantity of the photons resource
                 }
+
+                ReceivedPower = Math.Abs(ReceivedPower);
             }
         }
 
@@ -166,6 +172,9 @@ namespace BeamedPowerPropulsion
 
         [KSPField(guiName = "Power Beamed", groupName = "calculator4", guiUnits = "EC/s", guiActive = false, guiActiveEditor = true), UI_FloatRange(minValue = 0, maxValue = 100000, stepIncrement = 1, scene = UI_Scene.Editor)]
         public float BeamedPower;
+
+        [KSPField(guiName = "Angle to source", groupName = "calculator4", guiUnits = "°", guiActive = false, guiActiveEditor = true), UI_FloatRange(minValue = 0, maxValue = 90, stepIncrement = 1, scene = UI_Scene.Editor)]
+        public float Angle;
 
         [KSPField(guiName = "Thrust", groupName = "calculator4", guiUnits = "N", guiActive = false, guiActiveEditor = true)]
         public float Thrust;
@@ -186,16 +195,16 @@ namespace BeamedPowerPropulsion
             {
                 float wavelength_num = (float)((CalcWavelength == Long) ? Math.Pow(10, -3) : 5 * Math.Pow(10, -8));
                 float spotArea = (float)(Math.Pow((1.44 * wavelength_num * Distance * 1000000d / SourceDishDia), 2) * 3.14);
-                double powerReceived = (spotArea > SurfaceArea) ?
-                    SurfaceArea / spotArea * BeamedPower * (CalcEfficiency / 100) : BeamedPower * (CalcEfficiency / 100);
+                double powerReceived = Math.Cos(Angle * Math.PI / 180) * ((spotArea > SurfaceArea) ?
+                    SurfaceArea / spotArea * BeamedPower * (CalcEfficiency / 100) : BeamedPower * (CalcEfficiency / 100));
 
-                double impulse = powerReceived * 1000 / c;
+                double impulse = powerReceived * 1000f / c;
                 Thrust = Mathf.Clamp((float)Math.Round((impulse * Reflectivity * 
-                    HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().photonthrust), 3), 0f, engines.GetMaxThrust() * 1000f);
+                    HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().photonthrust), 3), 0f, engine.GetMaxThrust() * 1000f);
             }
             else if (HighLogic.LoadedSceneIsFlight)
             {
-                engines.Fields["propellantReqMet"].guiActive = false;
+                engine.Fields["propellantReqMet"].guiActive = false;
             }
         }
     }

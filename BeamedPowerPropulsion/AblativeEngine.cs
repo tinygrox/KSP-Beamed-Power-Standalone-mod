@@ -50,6 +50,7 @@ namespace BeamedPowerPropulsion
         }
 
         ModuleEnginesFX engine; ReceivedPower receiver; float percentThrust;
+        readonly int EChash = PartResourceLibrary.Instance.GetDefinition("ElectricCharge").id;
         string operational = Localizer.Format("#LOC_BeamedPower_status_Operational");
         string engineOff = Localizer.Format("#LOC_BeamedPower_ThermalEngine_EngineOff");
 
@@ -154,7 +155,7 @@ namespace BeamedPowerPropulsion
 
                 // calculate thrust based on power received
                 float Thrust = (float)(received_power * 0.2f / (shc * 8600f)) * 9.8f * currentisp;    // in kN
-                Thrust = (Thrust < 15f) ? 0f : Thrust; // minimum thrust (min received power) below this there isnt enough heat to exceed metal's boiling point
+                Thrust = (Thrust < 20f) ? 0f : Thrust; // minimum thrust (min received power) below this there isnt enough heat to exceed metal's boiling point
 
                 // propellant loss
                 Loss = (float)((received_power / Efficiency) * (1 - Efficiency) * 0.2f / (shc * 2600f * density));  // units/s (l/s)
@@ -168,6 +169,12 @@ namespace BeamedPowerPropulsion
                 // adjust thrust limiter, based on what max thrust should be as calculated
                 percentThrust = Thrust * thrustMult / engine.maxThrust;
                 engine.thrustPercentage = Mathf.Clamp((float)Math.Round(percentThrust * 100, 2), 0f, 100f);
+
+                this.vessel.GetConnectedResourceTotals(EChash, out double ECamount, out double maxAmount);
+                if (ECamount / maxAmount < 0.01f)
+                {
+                    engine.thrustPercentage = 0f;
+                }
             }
         }
 
@@ -219,7 +226,7 @@ namespace BeamedPowerPropulsion
                 float shc = PartResourceLibrary.Instance.GetDefinition(propellantname).specificHeatCapacity * 1.5f / 1000f;    // in kJ kg^-1 K^-1
                 Thrust = Mathf.Clamp((float)Math.Round((powerReceived * 0.2f / (shc * 8600f)) * 9.8d * Isp, 1), 
                     0f, engine.GetMaxThrust());
-                Thrust = (Thrust < 15f) ? 0f : Thrust;
+                Thrust = (Thrust < 20f) ? 0f : Thrust;
             }
             else if (HighLogic.LoadedSceneIsFlight)
             {

@@ -17,7 +17,7 @@ namespace BeamedPowerStandalone
         List<string> targetList = new List<string>();
         public List<string> wavelengthList = new List<string>();
         List<CelestialBody> planetList = new List<CelestialBody>();
-        int frames = 140;
+        int frames = 20;
 
         //localization
         string occludedby = Localizer.Format("#LOC_BeamedPower_status_Occludedby") + " ";
@@ -25,19 +25,19 @@ namespace BeamedPowerStandalone
         string vesselNone = Localizer.Format("#LOC_BeamedPower_Vessel_None");
         string warpEngaged = Localizer.Format("#LOC_BeamedPower_WarpDriveEngaged");
 
-        private double FractionalFlux(Vector3d source_pos, Vector3d dest_pos, Part thisPart)
+        private double FractionalFlux(Vector3d source_pos, Vector3d dest_pos, Part part)
         {
             Vector3d resultant = (source_pos - dest_pos).normalized;
-            double Angle = Vector3d.Angle(resultant, -thisPart.transform.up);
-            double flux = (Angle < 90 & Angle > -90) ? Math.Cos(Math.PI * Angle / 180) : 0;
+            double Angle = Vector3d.Angle(resultant, -part.transform.up);
+            double flux = Math.Cos(Math.PI * Angle / 180);
             return flux;
         }
 
         public void Directional(Part thisPart, int counter, bool Listening, float percentagePower, double recvSize, double recvEfficiency,
-            bool useSpotArea, bool useFacingVector, string state, out string status, out string VesselName, out double received_power, out int counter2)
+            bool useSpotArea, bool useFacingVector, string state, out string status, out string VesselName, out double receivedpower, out int count)
         {
             frames += 1;
-            if (frames == 150)
+            if (frames == 30)
             {
                 vesselFinder.SourceData(out VesselList, out excessList, out constantList, out targetList, out wavelengthList);
                 frames = 0;
@@ -49,7 +49,7 @@ namespace BeamedPowerStandalone
             
             if (VesselList.Count > 0)
             {
-                if (Listening == true & targetList[counter] == thisPart.vessel.GetDisplayName())
+                if (Listening & targetList[counter] == thisPart.vessel.GetDisplayName())
                 {
                     Vector3d dest = thisPart.vessel.GetWorldPos3D(); 
                     double excess2 = excessList[counter]; double constant2 = constantList[counter];
@@ -63,15 +63,15 @@ namespace BeamedPowerStandalone
                     // adding EC that has been received
                     if (recvSize < spotsize)
                     {
-                        received_power = Math.Round(((recvSize / spotsize) * recvEfficiency * excess2 * (percentagePower / 100)), 1);
+                        receivedpower = Math.Round(((recvSize / spotsize) * recvEfficiency * excess2 * (percentagePower / 100)), 1);
                     }
                     else
                     {
-                        received_power = Math.Round(((recvEfficiency * excess2) * (percentagePower / 100)), 1);
+                        receivedpower = Math.Round(((recvEfficiency * excess2) * (percentagePower / 100)), 1);
                     }
                     if (occluded)
                     {
-                        received_power = 0;
+                        receivedpower = 0;
                         state = occludedby + body.GetDisplayName().TrimEnd('N', '^');
                     }
                     else
@@ -79,36 +79,36 @@ namespace BeamedPowerStandalone
                         state = operational;
                     }
 
-                    received_power *= relativistic.RedOrBlueShift(VesselList[counter], thisPart.vessel, state, out state);
-                    if (useFacingVector)
+                    receivedpower *= relativistic.RedOrBlueShift(VesselList[counter], thisPart.vessel, state, out state);
+                    if (useFacingVector && FractionalFlux(source, dest, thisPart) > 0)
                     {
-                        received_power *= FractionalFlux(source, dest, thisPart);
+                        receivedpower *= FractionalFlux(source, dest, thisPart);
                     }
                     if (relativistic.WarpDriveEngaged(thisPart))
                     {
-                        received_power = 0;
+                        receivedpower = 0;
                         state = warpEngaged;
                     }
                 }
                 else
                 {
-                    received_power = 0;
+                    receivedpower = 0;
                     VesselName = vesselNone;
                 }
             }
             else
             {
-                received_power = 0;
+                receivedpower = 0;
                 VesselName = vesselNone;
             }
-            status = state; counter2 = counter;
+            status = state; count = counter;
         }
 
         public void Spherical(Part thisPart, bool Listening, float percentagePower, double recvSize,
              double recvEfficiency, bool useSpotArea, bool useFacingVector, string state, out string status, out double received_power)
         {
             frames += 1;
-            if (frames == 150)
+            if (frames == 30)
             {
                 vesselFinder.SourceData(out VesselList, out excessList, out constantList, out targetList, out wavelengthList);
                 frames = 0;
@@ -117,7 +117,7 @@ namespace BeamedPowerStandalone
             received_power = 0;
             if (VesselList.Count > 0)
             {
-                if (Listening == true)
+                if (Listening)
                 {
                     Vector3d dest = thisPart.vessel.GetWorldPos3D();
                     planetList.Clear();

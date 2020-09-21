@@ -61,7 +61,7 @@
     <Compile Include="Settings.cs" />
     <Compile Include="VesselModule.cs" />
     <Compile Include="BeamedPowerReflector.cs" />
-    <Compile Include="UsefulClasses.cs" />
+    <Compile Include="UsefulModules.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

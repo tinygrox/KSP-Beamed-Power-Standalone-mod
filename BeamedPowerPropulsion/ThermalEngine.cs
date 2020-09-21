@@ -45,7 +45,7 @@ namespace BeamedPowerPropulsion
         public float thrustMult = 1f;
 
         [KSPField(isPersistant = false)]
-        public bool IsJetEngine = false;
+        public string IsJetEngine = "False";
 
         [KSPField(isPersistant = false)]
         public float maxCoreTemp = 1000f;
@@ -56,6 +56,7 @@ namespace BeamedPowerPropulsion
         //declaring frequently used variables
         int initFrames; ModuleEnginesFX engine;
         ModuleCoreHeat coreHeat; ReceivedPower receiver; float percentThrust;
+        readonly int EChash = PartResourceLibrary.Instance.GetDefinition("ElectricCharge").id;
         string operational = Localizer.Format("#LOC_BeamedPower_status_Operational");
         string ExceedTempLimit = Localizer.Format("#LOC_BeamedPower_status_ExceededTempLimit");
         string engineOff = Localizer.Format("#LOC_BeamedPower_ThermalEngine_EngineOff");
@@ -73,8 +74,9 @@ namespace BeamedPowerPropulsion
             }
             receiver = new ReceivedPower();
             engine.throttleResponseRate /= 5;
-            Fields["CoreTemp"].Attribute.guiUnits = "K/" + maxCoreTemp.ToString() + "K";
-            Fields["SkinTemp"].Attribute.guiUnits = "K/" + maxSkinTemp.ToString() + "K";
+            Fields["CoreTemp"].guiUnits = "K/" + maxCoreTemp.ToString() + "K";
+            Fields["SkinTemp"].guiUnits = "K/" + maxSkinTemp.ToString() + "K";
+            
             try
             {
                 // editing engine's thrust limiter field's gui
@@ -168,7 +170,7 @@ namespace BeamedPowerPropulsion
 
             WasteHeat = (float)Math.Round(heatExcess, 1);
             coreHeat.AddEnergyToCore(heatExcess * 0.5 * TimeWarp.fixedDeltaTime);  // first converted to kJ
-            this.part.AddSkinThermalFlux(heatExcess * 0.5);     // waste heat from receiver + waste heat from engine
+            this.part.AddSkinThermalFlux(heatExcess * 0.4);     // waste heat from receiver + waste heat from engine
         }
 
         public void FixedUpdate()
@@ -188,26 +190,31 @@ namespace BeamedPowerPropulsion
                 receiver.Spherical(this.part, true, PowerLimiter, recvDiameter, recvEfficiency, false, false, State,
                     out State, out double recvPower);
 
-                this.part.GetConnectedResourceTotals(engine.propellants[0].id, out double amount, out _);
-                if (amount <= 0.5f)
+                if (engine.getFlameoutState | !engine.getIgnitionState)
                 {
-                    recvPower = 0f;
+                    recvPower = 0d;
                     State = engineOff;
                 }
                 ReceivedPower = (float)(Math.Round(recvPower, 1));
 
                 // code related to engine module
                 float currentisp = engine.realIsp;
-                float ApproxTemp = (IsJetEngine) ? 1100f : 2400f;
+                float ApproxTemp = (IsJetEngine == "True") ? 1100f : 2400f;
 
                 PropellantName = engine.propellants[0].displayName; string propellantname = engine.propellants[0].name;
                 float shc = PartResourceLibrary.Instance.GetDefinition(propellantname).specificHeatCapacity * 1.5f / 1000f;    // in kJ kg^-1 K^-1
 
                 // calculate thrust based on power received
-                float Thrust = (ReceivedPower * thermalEfficiency * 0.7f / (shc * ApproxTemp)) * 9.8f * currentisp;   // in kN
-                Thrust = (Thrust < 5f) ? 0f : Thrust; // minimum thrust (min received power) below this there isnt enough heat to reach optimum temperature
+                float Thrust = (ReceivedPower * thermalEfficiency * 0.4f / (shc * ApproxTemp)) * 9.8f * currentisp;   // in kN
+                Thrust = (Thrust < 10f) ? 0f : Thrust; // minimum thrust (min received power) below this there isnt enough heat to reach optimum temperature
                 percentThrust = Thrust * thrustMult / engine.maxThrust;
                 engine.thrustPercentage = Mathf.Clamp((float)Math.Round(percentThrust * 100, 2), 0f, 100f);
+
+                this.vessel.GetConnectedResourceTotals(EChash, out double ECamount, out double maxAmount);
+                if (ECamount / maxAmount < 0.05f)
+                {
+                    engine.thrustPercentage = 0f;
+                }
             }
         }
 
@@ -239,7 +246,7 @@ namespace BeamedPowerPropulsion
             CalcWavelength = (CalcWavelength == Long) ? Short : Long;
         }
         string Long = Localizer.Format("#LOC_BeamedPower_Wavelength_long"); string Short = Localizer.Format("#LOC_BeamedPower_Wavelength_short");
-
+        
         public void Update()
         {
             if (HighLogic.LoadedSceneIsEditor)
@@ -251,9 +258,9 @@ namespace BeamedPowerPropulsion
 
                 string propellantname = engine.propellants[0].name;
                 float shc = PartResourceLibrary.Instance.GetDefinition(propellantname).specificHeatCapacity * 1.5f / 1000f;    // in kJ kg^-1 K^-1
-                Thrust = Mathf.Clamp((float)Math.Round(((powerReceived * thermalEfficiency * 0.7f) / (shc * 2400f)) * 9.8f * Isp, 1), 
+                Thrust = Mathf.Clamp((float)Math.Round(((powerReceived * thermalEfficiency * 0.4f) / (shc * 2400f)) * 9.8f * Isp, 1), 
                     0f, engine.GetMaxThrust());
-                Thrust = (Thrust < 5f) ? 0f : Thrust * thrustMult;
+                Thrust = (Thrust < 10f) ? 0f : Thrust * thrustMult;
             }
             else if (HighLogic.LoadedSceneIsFlight)
             {

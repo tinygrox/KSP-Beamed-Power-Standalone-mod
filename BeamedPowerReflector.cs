@@ -80,7 +80,7 @@ namespace BeamedPowerStandalone
         public string TransmittingTo = Localizer.Format("#LOC_BeamedPower_Vessel_None");
 
         // declaring frequently used variables
-        VesselFinder vesselFinder = new VesselFinder(); //RelativisticEffects relativistic = new RelativisticEffects();
+        VesselFinder vesselFinder = new VesselFinder();
         readonly int EChash = PartResourceLibrary.Instance.GetDefinition("ElectricCharge").id; int initFrames;
         ModuleCoreHeat coreHeat; ReceivedPower receiver = new ReceivedPower(); double heatModifier;
 
@@ -285,6 +285,7 @@ namespace BeamedPowerStandalone
 
                 constant = (float)((Wavelength == "Long") ? 1.44 * Math.Pow(10, -3) / ReflectorDiameter : 
                     1.44 * 5 * Math.Pow(10, -8) / ReflectorDiameter);
+                vesselFinder.ReceiverData(out receiverConfigList);
                 TransmittingTo = receiverConfigList[receiverCounter].GetValue("name");
             }
         }
