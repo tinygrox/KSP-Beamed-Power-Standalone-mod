@@ -80,7 +80,7 @@ namespace BeamedPowerStandalone
                     }
 
                     receivedpower *= relativistic.RedOrBlueShift(VesselList[counter], thisPart.vessel, state, out state);
-                    if (useFacingVector && FractionalFlux(source, dest, thisPart) > 0)
+                    if (useFacingVector)
                     {
                         receivedpower *= FractionalFlux(source, dest, thisPart);
                     }

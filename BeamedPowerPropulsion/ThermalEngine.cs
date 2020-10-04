@@ -73,7 +73,6 @@ namespace BeamedPowerPropulsion
                 Debug.LogError(("BeamedPowerPropulsion.ThermalEngine : ModuleEnginesFX not found on part-" + this.part.partName));
             }
             receiver = new ReceivedPower();
-            engine.throttleResponseRate /= 5;
             Fields["CoreTemp"].guiUnits = "K/" + maxCoreTemp.ToString() + "K";
             Fields["SkinTemp"].guiUnits = "K/" + maxSkinTemp.ToString() + "K";
             
@@ -173,6 +172,18 @@ namespace BeamedPowerPropulsion
             this.part.AddSkinThermalFlux(heatExcess * 0.4);     // waste heat from receiver + waste heat from engine
         }
 
+        private void LockGimbal()
+        {
+            if (this.part.Modules.Contains<ModuleGimbal>() && engine.GetCurrentThrust() < 1f)
+            {
+                this.part.Modules.GetModule<ModuleGimbal>().gimbalActive = false;
+            }
+            else if (this.part.Modules.Contains<ModuleGimbal>() && engine.GetCurrentThrust() > 1f)
+            {
+                this.part.Modules.GetModule<ModuleGimbal>().gimbalActive = true;
+            }
+        }
+
         public void FixedUpdate()
         {
             if (HighLogic.LoadedSceneIsFlight)
@@ -215,6 +226,8 @@ namespace BeamedPowerPropulsion
                 {
                     engine.thrustPercentage = 0f;
                 }
+
+                LockGimbal();
             }
         }
 
@@ -265,6 +278,7 @@ namespace BeamedPowerPropulsion
             else if (HighLogic.LoadedSceneIsFlight)
             {
                 engine.thrustPercentage = Mathf.Clamp((float)Math.Round(percentThrust * 100, 2), 0f, 100f);
+                LockGimbal();
             }
         }
     }

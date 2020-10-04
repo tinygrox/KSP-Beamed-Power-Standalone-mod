@@ -65,9 +65,6 @@ namespace BeamedPowerPropulsion
             {
                 Debug.LogError(("BeamedPowerPropulsion.AblativeEngine : ModuleEnginesFX not found on part-" + this.part.partName));
             }
-            engine.throttleInstant = false;
-            engine.throttleResponseRate /= 5;
-            engine.engineSpoolTime = 5;
             receiver = new ReceivedPower();
             try
             {
@@ -143,7 +140,15 @@ namespace BeamedPowerPropulsion
                     received_power = 0f;
                     State = engineOff;
                 }
-                ReceivedPower = (float)Math.Round(received_power, 1);
+
+                if (received_power > 0f)
+                {
+                    ReceivedPower = (float)Math.Round(received_power, 1);
+                }
+                else
+                {
+                    ReceivedPower = 0f;
+                }
 
                 // code related to engine module
                 float currentisp = engine.realIsp;
