@@ -25,7 +25,7 @@ namespace BeamedPowerStandalone
         [GameParameters.CustomParameterUI("Some Relativistic Effects", unlockedDuringMission = false)]
         public bool relativistic = false;
 
-        [GameParameters.CustomParameterUI("Background Vessel Processing", unlockedDuringMission = false)]
+        [GameParameters.CustomParameterUI("Background Vessel Processing (WIP)", unlockedDuringMission = false)]
         public bool BackgroundProcessing = false;
 
         public override void SetDifficultyPreset(GameParameters.Preset preset)

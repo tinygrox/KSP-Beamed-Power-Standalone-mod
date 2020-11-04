@@ -39,8 +39,8 @@ namespace BeamedPowerStandalone
                                     {
                                        if (part.Modules.Contains<WirelessSource>())
                                        {
-                                          excess.Add(Convert.ToDouble(part.Modules.GetModule<WirelessSource>().Fields.GetValue("excess")));
-                                          constant.Add(Convert.ToDouble(part.Modules.GetModule<WirelessSource>().Fields.GetValue("constant")));
+                                          excess.Add(Convert.ToDouble(part.Modules.GetModule<WirelessSource>().Fields.GetValue("Excess")));
+                                          constant.Add(Convert.ToDouble(part.Modules.GetModule<WirelessSource>().Fields.GetValue("Constant")));
                                           target.Add(Convert.ToString(part.Modules.GetModule<WirelessSource>().Fields.GetValue("TransmittingTo")));
                                           wave.Add(Convert.ToString(part.Modules.GetModule<WirelessSource>().Fields.GetValue("Wavelength")));
                                           break;
@@ -49,8 +49,8 @@ namespace BeamedPowerStandalone
                                  }
                                  else
                                  {
-                                    excess.Add(Convert.ToDouble(module.GetValue("excess")));
-                                    constant.Add(Convert.ToDouble(module.GetValue("constant")));
+                                    excess.Add(Convert.ToDouble(module.GetValue("Excess")));
+                                    constant.Add(Convert.ToDouble(module.GetValue("Constant")));
                                     target.Add(module.GetValue("TransmittingTo"));
                                     wave.Add(module.GetValue("Wavelength"));
                                  }
@@ -72,8 +72,8 @@ namespace BeamedPowerStandalone
                                     {
                                        if (part.Modules.Contains<WirelessReflector>())
                                        {
-                                          excess.Add(Convert.ToDouble(part.Modules.GetModule<WirelessReflector>().Fields.GetValue("excess")));
-                                          constant.Add(Convert.ToDouble(part.Modules.GetModule<WirelessReflector>().Fields.GetValue("constant")));
+                                          excess.Add(Convert.ToDouble(part.Modules.GetModule<WirelessReflector>().Fields.GetValue("Excess")));
+                                          constant.Add(Convert.ToDouble(part.Modules.GetModule<WirelessReflector>().Fields.GetValue("Constant")));
                                           target.Add(Convert.ToString(part.Modules.GetModule<WirelessReflector>().Fields.GetValue("TransmittingTo")));
                                           wave.Add(Convert.ToString(part.Modules.GetModule<WirelessReflector>().Fields.GetValue("Wavelength")));
                                           break;
@@ -82,8 +82,8 @@ namespace BeamedPowerStandalone
                                  }
                                  else
                                  {
-                                    excess.Add(Convert.ToDouble(module.GetValue("excess")));
-                                    constant.Add(Convert.ToDouble(module.GetValue("constant")));
+                                    excess.Add(Convert.ToDouble(module.GetValue("Excess")));
+                                    constant.Add(Convert.ToDouble(module.GetValue("Constant")));
                                     target.Add(module.GetValue("TransmittingTo"));
                                     wave.Add(module.GetValue("Wavelength"));
                                  }

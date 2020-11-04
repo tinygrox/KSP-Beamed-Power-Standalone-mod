@@ -16,13 +16,13 @@ namespace BeamedPowerStandalone
 
         // optional parameters also set in part.cfg, only needed if the reflector can amplify
         [KSPField(isPersistant = false)]
-        public string CanAmplify;
+        public string CanAmplify = "False";
 
         [KSPField(isPersistant = false)]
-        public float Efficiency;
+        public float Efficiency = 0f;
 
         [KSPField(isPersistant = false)]
-        public string wavelength;
+        public string wavelength = "None";
 
         [KSPField(isPersistant = false)]
         public float maxCoreTemp = 900f;
@@ -39,10 +39,10 @@ namespace BeamedPowerStandalone
 
         // variables on transmitter
         [KSPField(isPersistant = true)]
-        public float excess;
+        public float Excess;
 
         [KSPField(isPersistant = true)]
-        public float constant;
+        public float Constant;
 
         [KSPField(isPersistant = true)]
         public string Wavelength;
@@ -264,8 +264,8 @@ namespace BeamedPowerStandalone
                     Wavelength = "Long";
                 }
                 
-                excess = (float)Math.Round(recvPower, 1);
-                this.part.AddSkinThermalFlux((excess / Reflectivity) * (1 - Reflectivity) * (heatModifier / 100));
+                Excess = (float)Math.Round(recvPower, 1);
+                this.part.AddSkinThermalFlux((Excess / Reflectivity) * (1 - Reflectivity) * (heatModifier / 100));
 
                 if (CanAmplify == "True" && wavelength == Wavelength)
                 {
@@ -275,15 +275,15 @@ namespace BeamedPowerStandalone
                     {
                         this.part.RequestResource(EChash, (double)resourceConsumption * Time.fixedDeltaTime);
                     }
-                    excess += Mathf.Clamp((resourceConsumption * Efficiency), 0f, 50000f);
+                    Excess += Mathf.Clamp((resourceConsumption * Efficiency), 0f, 50000f);
                 }
                 else
                 {
                     AmplifyMult = 1f;
                 }
-                PowerReflected = (float)Math.Round(excess, 1);
+                PowerReflected = (float)Math.Round(Excess, 1);
 
-                constant = (float)((Wavelength == "Long") ? 1.44 * Math.Pow(10, -3) / ReflectorDiameter : 
+                Constant = (float)((Wavelength == "Long") ? 1.44 * Math.Pow(10, -3) / ReflectorDiameter : 
                     1.44 * 5 * Math.Pow(10, -8) / ReflectorDiameter);
                 vesselFinder.ReceiverData(out receiverConfigList);
                 TransmittingTo = receiverConfigList[receiverCounter].GetValue("name");

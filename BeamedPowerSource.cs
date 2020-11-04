@@ -15,10 +15,10 @@ namespace BeamedPowerStandalone
         public float PowerBeamed;
 
         [KSPField(guiName = "Beamed Power", isPersistant = true, guiActive = true, guiActiveEditor = false, guiUnits = "EC/s", guiActiveUnfocused = true, unfocusedRange = 10000000000000)]
-        public float excess;
+        public float Excess;
 
         [KSPField(isPersistant = true)]
-        public float constant;
+        public float Constant;
 
         [KSPField(guiName = "Transmitting To", isPersistant = true, guiActive = true, guiActiveEditor = false)]
         public string TransmittingTo;
@@ -73,7 +73,7 @@ namespace BeamedPowerStandalone
             //flight
             Fields["Transmitting"].guiName = Localizer.Format("#LOC_BeamedPower_WirelessSource_PowerTransmitter");
             Fields["PowerBeamed"].guiName = Localizer.Format("#LOC_BeamedPower_WirelessSource_PowerToBeam");
-            Fields["excess"].guiName = Localizer.Format("#LOC_BeamedPower_WirelessSource_BeamedPower");
+            Fields["Excess"].guiName = Localizer.Format("#LOC_BeamedPower_WirelessSource_BeamedPower");
             Fields["TransmittingTo"].guiName = Localizer.Format("#LOC_BeamedPower_WirelessSource_TransmittingTo");
             Fields["State"].guiName = Localizer.Format("#LOC_BeamedPower_Status");
             Fields["CoreTemp"].guiName = Localizer.Format("#LOC_BeamedPower_CoreTemp");
@@ -174,7 +174,7 @@ namespace BeamedPowerStandalone
                 State = operational;
             }
             double heatModifier = (double)HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().PercentHeat / 100;
-            double heatExcess = (1 - Efficiency) * (excess / Efficiency) * heatModifier;
+            double heatExcess = (1 - Efficiency) * (Excess / Efficiency) * heatModifier;
             WasteHeat = (float)Math.Round(heatExcess, 1);
             coreHeat.AddEnergyToCore(heatExcess * 0.7 * TimeWarp.fixedDeltaTime);  // first converted to kJ
             this.part.AddSkinThermalFlux(heatExcess * 0.3);      // some heat added to skin
@@ -239,30 +239,30 @@ namespace BeamedPowerStandalone
                     }
 
                     // a bunch of math
-                    excess = Convert.ToSingle(Math.Round((PowerBeamed * Efficiency), 1));
+                    Excess = Convert.ToSingle(Math.Round((PowerBeamed * Efficiency), 1));
                     if (Wavelength == "Short")      // short ultraviolet
                     {
-                        constant = Convert.ToSingle((1.44 * 5 * Math.Pow(10, -8)) / DishDiameter);
+                        Constant = Convert.ToSingle((1.44 * 5 * Math.Pow(10, -8)) / DishDiameter);
                     }
                     else if (Wavelength == "Long")  // short microwave
                     {
-                        constant = Convert.ToSingle((1.44 * Math.Pow(10, -3)) / DishDiameter);
+                        Constant = Convert.ToSingle((1.44 * Math.Pow(10, -3)) / DishDiameter);
                     }
                     else
                     {
-                        Debug.LogWarning("BeamedPowerStandalone.WirelessSource : Incorrect paramater for wavelength in part.cfg");
-                        constant = 1f;
+                        Debug.LogWarning("BeamedPowerStandalone.WirelessSource : Incorrect wavelength set in .cfg file of part- " + this.part.partName);
+                        Constant = 1f;
                     }
 
                     if (HighLogic.CurrentGame.Parameters.CustomParams<BPSettings>().BackgroundProcessing == false)
                     {
                         // reducing amount of EC in craft in each frame (makes it look like continuous EC consumption)
-                        this.part.RequestResource(EChash, (double)(PowerBeamed * Time.fixedDeltaTime));
+                        this.part.RequestResource(EChash, (double)(PowerBeamed * TimeWarp.fixedDeltaTime));
                     }
                 }
                 else
                 {
-                    excess = 0; 
+                    Excess = 0; 
                 }
             }
         }
