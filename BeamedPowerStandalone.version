@@ -1,7 +1,7 @@
 {
     "NAME":"BeamedPowerStandalone"
-	"URL":"https://github.com/AniruddhKSP/KSP-Beamed-Power-Standalone-mod/blob/master/BeamedPowerStandalone.version",
-	"DOWNLOAD":"https://spacedock.info/mod/2492/Beamed%20Power%20Plugin",
+    "URL":"https://github.com/AniruddhKSP/KSP-Beamed-Power-Standalone-mod/blob/master/BeamedPowerStandalone.version",
+    "DOWNLOAD":"https://spacedock.info/mod/2492/Beamed%20Power%20Plugin",
     "VERSION":
     {
         "MAJOR":1,
@@ -16,13 +16,13 @@
         "PATCH":1
     },
     "KSP_VERSION_MIN":
-	{
+    {
         "MAJOR":1,
         "MINOR":8,
         "PATCH":0
     },
     "KSP_VERSION_MAX":
-	{
+    {
         "MAJOR":1,
         "MINOR":10,
         "PATCH":99
