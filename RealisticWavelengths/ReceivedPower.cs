@@ -108,7 +108,7 @@ namespace BeamedPowerStandalone
              double recvEfficiency, bool useSpotArea, bool useFacingVector, string state, out string status, out double received_power)
         {
             frames += 1;
-            if (frames == 30)
+            if (frames == 40)
             {
                 vesselFinder.SourceData(thisPart.vessel.GetDisplayName(), out VesselList, out excessList, out constantList, out targetList, out wavelengthList);
                 frames = 0;
